@@ -8,9 +8,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define MSG_BAL_CHECK 0
-#define MSG_BAL_UPDATE 1
-#define MSG_BAL_RUN 2
+#define MSG_ACC_CHECK 4
+#define MSG_ACC_UPDATE 8
+#define MSG_ACC_RUN 16
 
 void initMCPipes(int *inputFD, int *outputFD, int username);
 void mCHandler(int inputMCFD, int outputMCFD, int username);

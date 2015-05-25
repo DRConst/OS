@@ -14,7 +14,7 @@ int main()
 
         if(bytesRead > 0 && fork() != 0)//Is Child
         {
-            //initMCPipes(&inputMCFD, &outputMCFD, username);
+            initMCPipes(&inputMCFD, &outputMCFD, username);
 
             mCHandler(inputMCFD, outputMCFD, username);
         }
@@ -38,8 +38,8 @@ void initPipes(int *inputFD, int *outputFD)
             exit(1);
         }
 
-    *inputFD = open("/tmp/accountingInput.pipe", O_RDONLY | O_NONBLOCK);
-    *outputFD = open("/tmp/accountingOutput.pipe", O_WRONLY | O_NONBLOCK);
+    *inputFD = open("/tmp/accountingInput.pipe", O_RDONLY);/*Blocks Until MC is Ready to Start*/
+    *outputFD = open("/tmp/accountingOutput.pipe", O_WRONLY);
 
 }
 
@@ -50,7 +50,7 @@ void initMCPipes(int *inputFD, int *outputFD, int username)
 
     sprintf(buff , "/tmp/%04xAccountingInput.pipe", username);
 
-    /*
+
     if(mkfifo(buff, 0666) != 0)
     {
         if(errno != EEXIST){
@@ -59,37 +59,42 @@ void initMCPipes(int *inputFD, int *outputFD, int username)
         }
 
     }
-    */
-    *inputFD = open(buff , O_RDONLY);
+
+    *inputFD = open(buff , O_WRONLY);/*Read and Write Direction Are Dictated Towards the MC*/
     //dup2(STDIN_FILENO, *inputFD);
 
     sprintf(buff , "/tmp/%04xAccountingOutput.pipe", username);
-    /*
+
     if(mkfifo(buff, 0666) != 0)
     if(errno != EEXIST)
     {
         printf("Output Pipe Creation Failed\n");
         exit(1);
     }
-    */
-    *outputFD = open(buff , O_WRONLY);
+
+    *outputFD = open(buff , O_RDONLY);
     //dup2(STDOUT_FILENO, *outputFD);
 }
 
 void mCHandler(int inputMCFD, int outputMCFD, int username)
 {
     accIntent acIt;
-    while(read(inputMCFD, &acIt, sizeof(acIt)) >= 0)
+    int bytesRead;
+    float balance;
+    while(1)
     {
+        bytesRead = read(outputMCFD, &acIt, sizeof(acIt));
+        if(bytesRead >= 0)
         switch (acIt.msgId)
         {
-            case MSG_BAL_CHECK:
-                printf("User %04x has a Balance of %f\n", username, balanceCheck(username));
+            case MSG_ACC_CHECK:
+                printf("User %04x has a Balance of %f\n", username, (balance = balanceCheck(username)));
+                write(inputMCFD, &balance, sizeof(float));
                 break;
-            case MSG_BAL_UPDATE:
+            case MSG_ACC_UPDATE:
                 balanceUpdate(username, acIt.amount);
                 break;
-            case MSG_BAL_RUN:
+            case MSG_ACC_RUN:
                 sendReply(outputMCFD, balanceRun(username, acIt.amount));
                 break;
             default:

@@ -44,14 +44,15 @@ int main()
             printf("Client ");
             printf(buff);
             printf(" Connected\n");
-            //if(fork() != 0)//Is Child
-            //{
-
+            /*if(fork() != 0)//Is Child
+            {*/
+                write(accountingInputPipe, &userName, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
                 initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, userName);
                 log("User Pipes Inited\n");
 
-                clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc, userName);
-           // }
+                clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe, userName);
+            //}
+
         }
 
     }
@@ -59,10 +60,11 @@ int main()
 }
 
 
-void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int userName)
+void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int accountingInputPipe, int accoutingOutputPipe, int userName)
 {
     Intent it;
     int cnt;
+    int shouldClose = 0;
     do{
         cnt = read(inputClientMC, &it, sizeof(it));
         if(cnt > 0)
@@ -73,30 +75,42 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                     execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,userName,it.dataSize);
                     break;
                 case MSG_BAL_CHECK:
-                    printf("User %04x has a Balance of %f\n", userName, balanceCheck(userName));
+                    printf("User %04x has a Balance of %f\n", userName, balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe, userName));
                     break;
                 case MSG_BAL_UPDATE:
                     balanceUpdate(userName);
                     break;
+                case MSG_MC_CLOSE:
+                    log("Client Disconnected");
+                    printf("User %04x has logged out\n", userName);
+                    exit(1);/*
+                    shouldClose = 1;
+                    break;*/
                 default:
                     printf("Intent Not Recognized\n");
                     break;
             }
         }
     }
-    while(1);
-    //while(read(inputClientMC, &it, sizeof(it)) <= 0)
-    //{
-
-    //}
+    while(!shouldClose);
 }
 
 
-float balanceCheck(int userName)
+float balanceCheck(int inputClientAcc, int outputClientAcc, int accountingInputPipe, int userName)
 {
     /*Talk to Accounting*/
+    Intent i;
+    i.msgId = MSG_ACC_CHECK;
+    char buff[64];
+    float bal;
+    sprintf(buff, "%d", userName);
 
-    return 0.0f;
+
+    write(outputClientAcc, &i, sizeof i);/*Write out Message to Accounting On the Exclusive Pipe*/
+
+    read(inputClientAcc, &bal, sizeof(float));
+
+    return bal;
 
 }
 
@@ -104,7 +118,7 @@ void balanceUpdate(int userName)
 {
     /*Talk to Accounting*/
 
-    printf("%04x has a Balance of %f", userName, balanceCheck(userName));
+    printf("%04x has a Balance of %f", userName, balanceCheck(0,0,0,userName));
 
 }
 
@@ -116,7 +130,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     accIntent ai;
     ai.msgId = MSG_ACC_RUN;
     ai.amount = 1.0f;
-    /*if((pid = fork()) == 0)
+    if((pid = fork()) == 0)/*TODO: Flip*/
     {/*
         while(!killFlag) {
             char buff[1024];
@@ -128,20 +142,17 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
             sleep(1000);
             /*Calc Next Bill
         }
-        kill(pid, SIGKILL);
+        kill(pid, SIGKILL);*/
+        exit(1);
 
-    }else{*/
-        int i = 0;
-        //while(read(inputClientMC, cmdString, dataSize) <= 0)/*STDIN has been overwritten by ClientPipe*/
-        //{i++;};
-        //while(strlen(cmdString) != dataSize)
+    }else{
         do{
             dataSize = read(inputClientMC, cmdString, dataSize);
         }while(dataSize <= 0);
         system(cmdString);
         printf("Got intent with datasize of %d\n", dataSize);
 
-    //}
+    }
 
 }
 
@@ -198,11 +209,11 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
     }
 
     *outputClientMC = open(buff , O_WRONLY);/*Will Block Until Client Catches Up*/
-    //dup2(*outputFD, STDOUT_FILENO);
+    //dup2(*outputClientMC, STDOUT_FILENO);
 
     sprintf(buff , "/tmp/%04xAccountingInput.pipe", userName);
 
-    /*
+
     if(mkfifo(buff, 0666) != 0)
     {
         if(errno != EEXIST){
@@ -211,19 +222,19 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
         }
 
     }
-    */
+
     *inputClientAcc = open(buff , O_RDONLY);
     //dup2(STDIN_FILENO, *inputFD);
 
     sprintf(buff , "/tmp/%04xAccountingOutput.pipe", userName);
-    /*
+
     if(mkfifo(buff, 0666) != 0)
     if(errno != EEXIST)
     {
         printf("Output Pipe Creation Failed\n");
         exit(1);
     }
-    */
+
     *outputClientAcc = open(buff , O_WRONLY);
 }
 
@@ -245,6 +256,6 @@ void initAccountingPipes(int *accountingInputPipe, int *accountingOutputPipe)
         exit(1);
     }
 
-    *accountingInputPipe = open("/tmp/accountingInput.pipe", O_RDONLY | O_NONBLOCK);
-    *accountingOutputPipe = open("/tmp/accountingOutput.pipe", O_WRONLY | O_NONBLOCK);
+    *accountingInputPipe = open("/tmp/accountingInput.pipe", O_WRONLY );
+    *accountingOutputPipe = open("/tmp/accountingOutput.pipe", O_RDONLY );
 }

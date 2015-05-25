@@ -1,6 +1,8 @@
 #include <string.h>
 #include "Client.h"
 
+void checkBalance(int pipe, int outputPipe, int name);
+
 int main()
 {
     /**/
@@ -34,6 +36,10 @@ int main()
     }
     while(outputPipe <= 0);/*Hold Until the Server Creates the Pipe*/
 
+
+    //dup2(STDOUT_FILENO, outputPipe);
+
+
     printf("PIPED");
     //write(inputPipe, "\0", 1);
     printf("What do you wish to do?\n1 - Input Commands\n2 - Check Balance\n3 - Update Balance\n");
@@ -45,6 +51,7 @@ int main()
             commandDialog(inputPipe, outputPipe, userName);
             break;
         case 2:
+            checkBalance(inputPipe, outputPipe, userName);
             break;
         case 3:
             break;
@@ -55,6 +62,19 @@ int main()
     printf(buff);
     printf("\n");
     return 0;
+}
+
+void checkBalance(int inputPipe, int outputPipe, int name)
+{
+    Intent i;
+    i.msgId = MSG_BAL_CHECK;
+    i.dataSize = 0;
+    float bal;
+
+    write(inputPipe, &i, sizeof i); /*Write the Intent*/
+
+    read(outputPipe, &bal, sizeof(float));
+    printf("Your Current Balance is %f", bal);
 }
 
 
@@ -70,25 +90,30 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
     //write(inputPipe, stB, sizeof i)
     while(1)
     {
-        char buff[64];
+        char buff[1024];
         char null[1];
         null[0] = '\0';
         int asd;
         //scanf("%s", buff);
         do{
-            fflush(stdout);
+            //fflush(stdout);
             fgets(buff, 64, stdin);
         }while((asd = strcmp(buff, " \n")) <= 0);
 
 
-        i.dataSize = (int) (strlen(buff));
         strtok(buff, "\n");
-        memcpy(stB, &i, sizeof i);
+
 
         if(!strcmp(buff, "MC_QUIT"))
         {
-
+            i.msgId = MSG_MC_CLOSE;
+            i.dataSize = -1;
+            memcpy(stB, &i, sizeof i);
+            write(inputPipe, stB, sizeof i);
         } else{
+
+            i.dataSize = (int) (strlen(buff));
+            memcpy(stB, &i, sizeof i);
 
             write(inputPipe, stB, sizeof i);
 
