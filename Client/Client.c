@@ -60,20 +60,40 @@ int main()
 
 void commandDialog(int inputPipe, int outputPipe, int userName)
 {
-    char buff[64];
+
     char stB[64];
     printf("You are now connected to the server, Ctlr+D disconnects\n");
     Intent i;
     i.msgId = MSG_EXEC_CMD;
 
-    memcpy(stB, &i, sizeof i);
-    write(inputPipe, stB, sizeof i);
-
+    //memcpy(stB, &i, sizeof i);
+    //write(inputPipe, stB, sizeof i)
     while(1)
     {
-        memset(buff,0, 64);
-        scanf("%s", buff);
-        write(inputPipe, buff, strlen(buff));
+        char buff[64];
+        char null[1];
+        null[0] = '\0';
+        int asd;
+        //scanf("%s", buff);
+        do{
+            fflush(stdout);
+            fgets(buff, 64, stdin);
+        }while((asd = strcmp(buff, " \n")) <= 0);
+
+
+        i.dataSize = (int) (strlen(buff));
+        strtok(buff, "\n");
+        memcpy(stB, &i, sizeof i);
+
+        if(!strcmp(buff, "MC_QUIT"))
+        {
+
+        } else{
+
+            write(inputPipe, stB, sizeof i);
+
+            write(inputPipe, buff, i.dataSize);
+        }
 
     }
 }

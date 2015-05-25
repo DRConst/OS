@@ -65,25 +65,29 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
     int cnt;
     do{
         cnt = read(inputClientMC, &it, sizeof(it));
+        if(cnt > 0)
+        {
+            switch (it.msgId)
+            {
+                case MSG_EXEC_CMD:
+                    execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,userName,it.dataSize);
+                    break;
+                case MSG_BAL_CHECK:
+                    printf("User %04x has a Balance of %f\n", userName, balanceCheck(userName));
+                    break;
+                case MSG_BAL_UPDATE:
+                    balanceUpdate(userName);
+                    break;
+                default:
+                    printf("Intent Not Recognized\n");
+                    break;
+            }
+        }
     }
-    while(cnt <= 0);
+    while(1);
     //while(read(inputClientMC, &it, sizeof(it)) <= 0)
     //{
-        switch (it.msgId)
-        {
-            case MSG_EXEC_CMD:
-                execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,userName,it.dataSize);
-                break;
-            case MSG_BAL_CHECK:
-                printf("User %04x has a Balance of %f\n", userName, balanceCheck(userName));
-                break;
-            case MSG_BAL_UPDATE:
-                balanceUpdate(userName);
-                break;
-            default:
-                printf("Intent Not Recognized");
-                break;
-        }
+
     //}
 }
 
@@ -108,11 +112,11 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
 {
     int killFlag = 0;
     int pid;
-    char *cmdString = malloc(dataSize);
+    char *cmdString = malloc(dataSize + 1);
     accIntent ai;
     ai.msgId = MSG_ACC_RUN;
     ai.amount = 1.0f;
-    if((pid = fork()) == 0)
+    /*if((pid = fork()) == 0)
     {/*
         while(!killFlag) {
             char buff[1024];
@@ -124,20 +128,20 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
             sleep(1000);
             /*Calc Next Bill
         }
-        kill(pid, SIGKILL);*/
+        kill(pid, SIGKILL);
 
-    }else{
+    }else{*/
+        int i = 0;
+        //while(read(inputClientMC, cmdString, dataSize) <= 0)/*STDIN has been overwritten by ClientPipe*/
+        //{i++;};
+        //while(strlen(cmdString) != dataSize)
+        do{
+            dataSize = read(inputClientMC, cmdString, dataSize);
+        }while(dataSize <= 0);
+        system(cmdString);
+        printf("Got intent with datasize of %d\n", dataSize);
 
-        while(strcmp(cmdString, "quit"))
-        {
-
-            while(read(inputClientMC, cmdString, dataSize) == 0);/*STDIN has been overwritten by ClientPipe*/
-            {/*Waiting on Data*/};
-
-            system(cmdString);
-        }
-
-    }
+    //}
 
 }
 
