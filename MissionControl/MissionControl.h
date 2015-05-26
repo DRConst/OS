@@ -30,7 +30,7 @@ void login(int username){};
 void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int accountingInputPipe, int accoutingOutputPipe, int userName);
 void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int userName, int dataSize);
 float balanceCheck(int inputClientAcc, int outputClientAcc, int accountingInputPipe, int userName);
-void balanceUpdate(int userName);
+float balanceUpdate(int inputClientAcc, int outputClientAcc, float bal, int userName);
 void initAccountingPipes(int *accountingInputPipe, int *accountingOutputPipe);
 
 typedef struct intent{

@@ -16,7 +16,7 @@
 void initMCPipes(int *inputFD, int *outputFD, int username);
 void mCHandler(int inputMCFD, int outputMCFD, int username);
 float balanceCheck(int username);
-void balanceUpdate(int username, float amount);
+float balanceUpdate(int username, float amount);
 int balanceRun(int username, float amount);
 void sendReply(int outputMCFD, int reply);
 

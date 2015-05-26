@@ -1,3 +1,4 @@
+#include <string.h>
 #include "Accounting.h"
 
 int main()
@@ -92,7 +93,10 @@ void mCHandler(int inputMCFD, int outputMCFD, int username)
                 write(inputMCFD, &balance, sizeof(float));
                 break;
             case MSG_ACC_UPDATE:
-                balanceUpdate(username, acIt.amount);
+                read(outputMCFD, &balance, sizeof balance);
+                printf("User %04x has a Balance of %f\n", username, (balance = balanceUpdate(username, balance)));
+                write(inputMCFD, &balance, sizeof(float));
+                //balanceUpdate(username, acIt.amount);
                 break;
             case MSG_ACC_RUN:
                 sendReply(outputMCFD, balanceRun(username, acIt.amount));
@@ -116,12 +120,12 @@ float balanceCheck(int username)
     float balance;
     FILE *fp;
 
-    sprintf(buff , "%04x.bal", username);
+    sprintf(buff , "/tmp/%04x.bal", username);
 
     if((fp = fopen(buff,"r")) != NULL)
     {
-        fscanf(fp,"%f", &balance);
-
+        fscanf(fp,"%s", buff);
+        balance = atof(buff);
         fclose(fp);
     }
     else
@@ -130,24 +134,28 @@ float balanceCheck(int username)
     return balance;
 }
 
-void balanceUpdate(int username, float amount)
+float balanceUpdate(int username, float amount)
 {
     float oldBalance = balanceCheck(username);
     char buff[32];
-    float balance;
+    float balance = -1;
     FILE *fp;
 
     balance = amount + oldBalance;
 
-    sprintf(buff, "%04x.bal", username);
+    sprintf(buff, "/tmp/%04x.bal", username);
 
     if ((fp = fopen(buff, "w")) != NULL) {
-        fwrite(&balance, 1, sizeof(balance), fp);
+        sprintf(buff, "%f\0", balance);
+        fwrite(buff, strlen(buff) + 1, 1, fp);
 
         fclose(fp);
+
+        return balance;
     }
     else
         printf("Oh Darn! Something went wrong trying to write to file!\n");
+    return balance;
 }
 
 int balanceRun (int username, float amount)

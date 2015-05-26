@@ -80,7 +80,9 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                     write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_BAL_UPDATE:
-                    balanceUpdate(userName);
+                    read(inputClientMC, &bal, sizeof bal);
+                    printf("User %04x has a Balance of %f\n", userName, (bal = balanceUpdate(inputClientAcc, outputClientAcc,bal, userName)));
+                    write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_MC_CLOSE:
                     log("Client Disconnected");
@@ -120,11 +122,23 @@ float balanceCheck(int inputClientAcc, int outputClientAcc, int accountingInputP
 
 }
 
-void balanceUpdate(int userName)
+float balanceUpdate(int inputClientAcc, int outputClientAcc, float bal, int userName)
 {
     /*Talk to Accounting*/
+    Intent i;
+    i.msgId = MSG_ACC_UPDATE;
+    char buff[64];
+    sprintf(buff, "%d", userName);
 
-    printf("%04x has a Balance of %f", userName, balanceCheck(0,0,0,userName));
+
+    write(outputClientAcc, &i, sizeof i);/*Write out Message to Accounting On the Exclusive Pipe*/
+
+
+    write(outputClientAcc, &bal, sizeof bal);
+
+    read(inputClientAcc, &bal, sizeof(float));
+
+    return bal;
 
 }
 
