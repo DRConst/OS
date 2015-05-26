@@ -74,7 +74,7 @@ void checkBalance(int inputPipe, int outputPipe, int name)
     write(inputPipe, &i, sizeof i); /*Write the Intent*/
 
     read(outputPipe, &bal, sizeof(float));
-    printf("Your Current Balance is %f", bal);
+    printf("Your Current Balance is %f\n", bal);
 }
 
 

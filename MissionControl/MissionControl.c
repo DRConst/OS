@@ -65,6 +65,7 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
     Intent it;
     int cnt;
     int shouldClose = 0;
+    float bal;
     do{
         cnt = read(inputClientMC, &it, sizeof(it));
         if(cnt > 0)
@@ -75,7 +76,8 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                     execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,userName,it.dataSize);
                     break;
                 case MSG_BAL_CHECK:
-                    printf("User %04x has a Balance of %f\n", userName, balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe, userName));
+                    printf("User %04x has a Balance of %f\n", userName, (bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe, userName)));
+                    write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_BAL_UPDATE:
                     balanceUpdate(userName);
