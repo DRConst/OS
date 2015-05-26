@@ -103,7 +103,7 @@ void CmdsNext( Commands cmds, char *str )
 void CmdsExec( Commands cmds )
 {
 	int i;
-	Cmd cur, next;
+	Cmd cur, prev;
 	int pipeIn, pipeOut;
 	int pipeFd[2];
 
@@ -113,24 +113,33 @@ void CmdsExec( Commands cmds )
 	for( i = 0; i < cmds->count; i++ ) {
 		cur = cmds->arrCmds[i];
 
-
 		if( fork() == 0 ) {	// Son
 
-			if( i )		// Not First
-				dup2( cur->pipeOut, 1);
+			if( i ) {        // Not First
+				dup2(prev->pipeIn, 0);
+				close(prev->pipeIn);
+				close(prev->pipeOut);
+			}
 
-			if( (i + 1) <= cmds->count )	// not Last
-				dup2( cur->pipeIn, 0 );
-
-
-//			close( cur->pipeIn );
-//			close( cur->pipeOut );
+			if( (i+1) < cmds->count ) {    // not Last
+				close( cur->pipeIn );
+				dup2( cur->pipeOut, 1 );
+				close( cur->pipeOut );
+			}
 
 			execvp( cur->op, cur->args );
 			exit(EXIT_FAILURE);
 		}
 		else {	// Parent
 
+//			close( cur->pipeOut );
+			if( i ) {
+				close(prev->pipeOut);
+				close(prev->pipeIn);
+			}
+
+			if( i+1 < cmds->count)
+				prev = cur;
 			wait( NULL );
 
 		}
