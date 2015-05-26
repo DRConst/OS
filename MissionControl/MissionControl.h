@@ -19,6 +19,7 @@
 #define MSG_ACC_CHECK 4
 #define MSG_ACC_UPDATE 8
 #define MSG_ACC_RUN 16
+#define MSG_ACC_DISC 32
 
 
 

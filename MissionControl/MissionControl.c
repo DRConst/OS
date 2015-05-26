@@ -44,14 +44,14 @@ int main()
             printf("Client ");
             printf(buff);
             printf(" Connected\n");
-            /*if(fork() != 0)//Is Child
-            {*/
+            if(fork() == 0)//Is Child
+            {
                 write(accountingInputPipe, &userName, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
                 initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, userName);
                 log("User Pipes Inited\n");
 
                 clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe, userName);
-            //}
+            }
 
         }
 
@@ -85,6 +85,10 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                 case MSG_MC_CLOSE:
                     log("Client Disconnected");
                     printf("User %04x has logged out\n", userName);
+                    it.msgId = MSG_ACC_DISC;
+                    write(outputClientAcc, &it, sizeof it);
+                    close(outputClientAcc);
+                    close(inputClientAcc);
                     exit(1);/*
                     shouldClose = 1;
                     break;*/

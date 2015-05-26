@@ -9,7 +9,7 @@ int main()
     int userName  = 123;
     char buff[32];
     int registerPipe, inputPipe, outputPipe;/*Input and Output Refer to MissionControl*/
-    int answer;
+    int answer = -1;
 
     /*Get User Credentials*/
 
@@ -42,22 +42,28 @@ int main()
 
     printf("PIPED");
     //write(inputPipe, "\0", 1);
+
     printf("What do you wish to do?\n1 - Input Commands\n2 - Check Balance\n3 - Update Balance\n");
     scanf("%d", &answer);
-
-    switch (answer)
+    while(answer)
     {
-        case 1:
-            commandDialog(inputPipe, outputPipe, userName);
-            break;
-        case 2:
-            checkBalance(inputPipe, outputPipe, userName);
-            break;
-        case 3:
-            break;
-        default:
-            return -1;
+        printf("What do you wish to do?\n1 - Input Commands\n2 - Check Balance\n3 - Update Balance\n");
+        scanf("%d", &answer);
+        switch (answer)
+        {
+            case 1:
+                commandDialog(inputPipe, outputPipe, userName);
+                break;
+            case 2:
+                checkBalance(inputPipe, outputPipe, userName);
+                break;
+            case 3:
+                break;
+            default:
+                return -1;
+        }
     }
+
     read(outputPipe, buff, sizeof buff);
     printf(buff);
     printf("\n");

@@ -12,7 +12,7 @@ int main()
     {
         bytesRead = read(inputPipeFD, &username, sizeof(int));
 
-        if(bytesRead > 0 && fork() != 0)//Is Child
+        if(bytesRead > 0 && fork() == 0)//Is Child
         {
             initMCPipes(&inputMCFD, &outputMCFD, username);
 
@@ -97,6 +97,12 @@ void mCHandler(int inputMCFD, int outputMCFD, int username)
             case MSG_ACC_RUN:
                 sendReply(outputMCFD, balanceRun(username, acIt.amount));
                 break;
+            case MSG_ACC_DISC:
+                printf("User %04x has Disconnected", username);
+                close(inputMCFD);
+                close(outputMCFD);
+                exit(0);
+                return;
             default:
                 printf("Accounting Intent Not Recognized");
                 break;
