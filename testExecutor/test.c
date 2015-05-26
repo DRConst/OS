@@ -27,7 +27,7 @@ void freeCommands( Commands cmds );
 char *trim( char *in );
 int main()
 {
-	char input[100] = "ls -l | wc -l | cat";
+	char input[100] = "ls | wc ";
 	char auxStrTok[100] = "";
 	Commands cmds;
 	char *ptr;
@@ -116,15 +116,15 @@ void CmdsExec( Commands cmds )
 		if( fork() == 0 ) {	// Son
 
 			if( i ) {        // Not First
-				dup2(prev->pipeIn, 0);
-				close(prev->pipeIn);
-				close(prev->pipeOut);
+				dup2(prev->pipeOut, 0);
+//				close(prev->pipeIn);
+//				close(prev->pipeOut);
 			}
 
 			if( (i+1) < cmds->count ) {    // not Last
-				close( cur->pipeIn );
+//				close( cur->pipeIn );
 				dup2( cur->pipeOut, 1 );
-				close( cur->pipeOut );
+//				close( cur->pipeOut );
 			}
 
 			execvp( cur->op, cur->args );
@@ -134,8 +134,8 @@ void CmdsExec( Commands cmds )
 
 //			close( cur->pipeOut );
 			if( i ) {
-				close(prev->pipeOut);
-				close(prev->pipeIn);
+//				close(prev->pipeOut);
+//				close(prev->pipeIn);
 			}
 
 			if( i+1 < cmds->count)
@@ -180,7 +180,7 @@ Cmd createCmd( char *str )
 
 	ptr = strtok_r( str, " ", &ctrl);
 	cmd->op = trim( ptr );
-
+	cmd->args = malloc( sizeof(char**));
 //	ptr = strchr( temp, ' ');
 	if( ctrl != NULL ) {
 		ptr = strtok_r(ctrl, " ", &ctrl2);
