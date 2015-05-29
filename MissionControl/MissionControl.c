@@ -34,6 +34,7 @@ int main()
     while(1)
     {
         bytesRead = read(inputPipeFD, buff, 32);
+        sleep(1);
         userName = atoi(buff);
         login(userName);
 
@@ -44,13 +45,16 @@ int main()
             printf("Client ");
             printf(buff);
             printf(" Connected\n");
-            if(fork() == 0)//Is Child
+            if(fork() != 0)//Is Child
             {
                 write(accountingInputPipe, &userName, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
                 initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, userName);
                 log("User Pipes Inited\n");
 
                 clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe, userName);
+            }
+            else{
+                exit(1);
             }
 
         }
@@ -146,23 +150,36 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
 {
     int killFlag = 0;
     int pid;
+    int fd[2];
+    char psRet[1024];
+    char buff[64];
     char *cmdString = malloc(dataSize + 1);
     accIntent ai;
     ai.msgId = MSG_ACC_RUN;
     ai.amount = 1.0f;
-    if((pid = fork()) == 0)/*TODO: Flip*/
-    {/*
+    if((pid = fork()) != 0)/*TODO: Flip*/
+    {
         while(!killFlag) {
-            char buff[1024];
-            memcpy(buff, &ai, sizeof ai);
-            write(inputClientAcc, buff, sizeof ai);
-            read(outputClientAcc, buff, 1024);
 
-            killFlag = atoi(read);
-            sleep(1000);
-            /*Calc Next Bill
+            pipe(fd);
+
+            if(fork() != 0)
+            {
+                close(fd[0]);
+                read(fd[1], psRet, sizeof psRet);
+            } else{
+                dup2(STDOUT_FILENO, fd[1]);
+                close(fd[0]);
+                sprintf(buff, "%d", pid);
+                execlp("pidstat", "pidstat","-p", buff, NULL);
+            }
+
+            printf("%s\n", psRet);
+            sleep(1);
+            killFlag = 1;
+            /*Calc Next Bill*/
         }
-        kill(pid, SIGKILL);*/
+        kill(pid, SIGKILL);
         exit(1);
 
     }else{

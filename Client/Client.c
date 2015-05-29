@@ -136,6 +136,7 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
             i.dataSize = -1;
             memcpy(stB, &i, sizeof i);
             write(inputPipe, stB, sizeof i);
+            return;
         } else{
 
             i.dataSize = (int) (strlen(buff));

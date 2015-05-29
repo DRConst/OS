@@ -13,7 +13,7 @@ int main()
     {
         bytesRead = read(inputPipeFD, &username, sizeof(int));
 
-        if(bytesRead > 0 && fork() == 0)//Is Child
+        if(bytesRead > 0 && fork() != 0)//Is Child
         {
             initMCPipes(&inputMCFD, &outputMCFD, username);
 
@@ -109,6 +109,7 @@ void mCHandler(int inputMCFD, int outputMCFD, int username)
                 return;
             default:
                 printf("Accounting Intent Not Recognized");
+                exit(0);
                 break;
         }
     }
