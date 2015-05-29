@@ -10,6 +10,7 @@ int main()
     int userName  = 123;
     char buff[32];
     int registerPipe, inputPipe, outputPipe;/*Input and Output Refer to MissionControl*/
+    int stdinPipe, stdoutPipe;
     int answer = -1;
     int sF = 0;
 
@@ -38,12 +39,25 @@ int main()
     }
     while(outputPipe <= 0);/*Hold Until the Server Creates the Pipe*/
 
+    sprintf(buff , "/tmp/%04xStdin.pipe", userName);
+    stdinPipe = open(buff, O_WRONLY);
 
-    //dup2(STDOUT_FILENO, outputPipe);
+    sprintf(buff , "/tmp/%04xStdout.pipe", userName);
+    stdoutPipe = open(buff, O_RDONLY);
 
+    if(fork() == 0)/*Replace with propper STDOUT routing*/
+    {
+        char b[2048];
+        while(1)
+        {
+            memset(b, '\0', sizeof b);
+            read(stdoutPipe, b, sizeof b);
+            printf("%s\n", b);
+            if(getppid() == 1)
+                exit(0);
+        }
 
-    printf("PIPED");
-    //write(inputPipe, "\0", 1);
+    }
     fflush(stdin);
     while(answer)
     {

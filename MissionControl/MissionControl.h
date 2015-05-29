@@ -25,7 +25,7 @@
 
 int main();
 void initPipes(int *inputFD, int *outputFD);
-void initUserPipes(int *inputMC, int *outputMC, int *inputAcc, int *outputAcc, int userName);
+void initUserPipes(int *inputMC, int *outputMC, int *inputAcc, int *outputAcc,int *stdinClient, int *stdoutClient, int userName);
 void login(int username){};
 void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int accountingInputPipe, int accoutingOutputPipe, int userName);
 void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int userName, int dataSize);

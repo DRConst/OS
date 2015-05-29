@@ -48,9 +48,10 @@ int main()
             if(fork() != 0)//Is Child
             {
                 write(accountingInputPipe, &userName, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
-                initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, userName);
+                initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, &stdinClient, &stdoutClient, userName);
                 log("User Pipes Inited\n");
-
+                dup2(STDOUT_FILENO, stdoutClient);
+                dup2(stdinClient, STDIN_FILENO);
                 clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe, userName);
             }
             else{
@@ -165,16 +166,20 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
 
             if(fork() != 0)
             {
-                close(fd[0]);
-                read(fd[1], psRet, sizeof psRet);
+                close(fd[1]);
+                read(fd[0], psRet, sizeof psRet);
             } else{
-                dup2(STDOUT_FILENO, fd[1]);
+
                 close(fd[0]);
+                dup2(fd[1], STDOUT_FILENO);
                 sprintf(buff, "%d", pid);
                 execlp("pidstat", "pidstat","-p", buff, NULL);
             }
 
             printf("%s\n", psRet);
+           // char *asd = strtok(psRet, "\n");
+             //= strtok(NULL, "\n");
+            //printf("%s\n", asd);
             sleep(1);
             killFlag = 1;
             /*Calc Next Bill*/
@@ -218,7 +223,7 @@ void initPipes(int *inputFD, int *outputFD)
 
 }
 
-void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc, int *outputClientAcc, int userName)
+void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc, int *outputClientAcc, int *stdinClient, int *stdoutClient, int userName)
 {
     char buff[32];
 
@@ -273,6 +278,31 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
     }
 
     *outputClientAcc = open(buff , O_WRONLY);
+
+    sprintf(buff , "/tmp/%04xStdin.pipe", userName);
+
+    if(mkfifo(buff, 0666) != 0)
+    if(errno != EEXIST)
+    {
+        printf("Output Pipe Creation Failed\n");
+        exit(1);
+    }
+
+    *stdinClient = open(buff , O_RDONLY);
+
+    sprintf(buff , "/tmp/%04xStdout.pipe", userName);
+
+    if(mkfifo(buff, 0666) != 0)
+    if(errno != EEXIST)
+    {
+        printf("Output Pipe Creation Failed\n");
+        exit(1);
+    }
+
+
+    *stdoutClient = open(buff , O_WRONLY);
+    //dup2(STDOUT_FILENO, *stdoutClient);
+    dup2(*stdoutClient , STDOUT_FILENO);
 }
 
 void initAccountingPipes(int *accountingInputPipe, int *accountingOutputPipe)
