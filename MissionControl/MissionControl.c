@@ -21,7 +21,7 @@ int main()
 
 
     //<editor-fold desc="Fork Specific Pipes">
-    int inputClientMC, outputClientMC, inputClientAcc, outputClientAcc;
+    int inputClientMC, outputClientMC, inputClientAcc, outputClientAcc, stdoutClient, stdinClient;
     //</editor-fold>
 
     int userName = 0;
@@ -180,7 +180,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
             /*Calc Next Bill*/
         }
         kill(pid, SIGKILL);
-        exit(1);
+        //exit(1);
 
     }else{
         do{
@@ -188,7 +188,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
         }while(dataSize <= 0);
         system(cmdString);
         printf("Got intent with datasize of %d\n", dataSize);
-
+        exit(1);
     }
 
 }

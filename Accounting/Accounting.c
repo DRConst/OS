@@ -13,7 +13,7 @@ int main()
     {
         bytesRead = read(inputPipeFD, &username, sizeof(int));
 
-        if(bytesRead > 0 && fork() != 0)//Is Child
+        if(bytesRead > 0 && fork() == 0)//Is Child
         {
             initMCPipes(&inputMCFD, &outputMCFD, username);
 

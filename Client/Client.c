@@ -47,7 +47,7 @@ int main()
     fflush(stdin);
     while(answer)
     {
-        printf("What do you wish to do?\n1 - Input Commands\n2 - Check Balance\n3 - Update Balance\n");
+        printf("What do you wish to do?\n1 - Input Commands\n2 - Check Balance\n3 - Update Balance\n0 - Exit\n");
         fflush(stdin);
         __fpurge(stdin);
         fflush(stdout);
@@ -69,9 +69,9 @@ int main()
             }
     }
 
-    read(outputPipe, buff, sizeof buff);
-    printf(buff);
-    printf("\n");
+    Intent quit;
+    quit.msgId = MSG_MC_CLOSE;
+    write(inputPipe, &quit, sizeof quit);
     return 0;
 }
 
@@ -135,7 +135,7 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
             i.msgId = MSG_MC_CLOSE;
             i.dataSize = -1;
             memcpy(stB, &i, sizeof i);
-            write(inputPipe, stB, sizeof i);
+            //write(inputPipe, stB, sizeof i);
             return;
         } else{
 
