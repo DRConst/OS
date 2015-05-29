@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <stdio.h>
 
 typedef struct cmd {
 
@@ -19,17 +20,19 @@ typedef struct commands {
 
 
 Cmd createCmd( char *str );
-Commands CmdsInit( char *first, int pipeIn, int pipeOut );
+Commands CmdsInit( char *first );
 void CmdsNext( Commands cmds, char *str );
 void CmdsExec( Commands cmds );
 void freeCommands( Commands cmds );
 
 char *trim( char *in );
+
+
 int main()
 {
-	char input[100] = "ls | wc ";
+	char input[100] = "ls";
 	char auxStrTok[100] = "";
-	Commands cmds;
+	Commands cmds = NULL;
 	char *ptr;
 	char *ctrl;
 
@@ -37,7 +40,7 @@ int main()
 	strcpy( auxStrTok, input );
 	ptr = strtok_r( input, "|", &ctrl );
 	if( ptr != NULL )
-		cmds = CmdsInit( ptr, STDIN_FILENO, STDOUT_FILENO );
+		cmds = CmdsInit( ptr );
 
 	ptr = strtok_r( NULL, "|", &ctrl);
 	while( ptr != NULL ) {
@@ -50,18 +53,20 @@ int main()
 
 	CmdsExec( cmds );
 
-//	freeCommands( cmds );
+	freeCommands( cmds );
 
 	return 0;
 }
 
-Commands CmdsInit( char *first, int pipeIn, int pipeOut )
+// Initializes a Commands Struct with the First Command
+Commands CmdsInit( char *first )
 {
 	Commands cmds;
-	Cmd cmdTemp = createCmd( first );
+	Cmd cmdTemp;
 
-	cmdTemp->pipeIn = pipeIn;
-	cmdTemp->pipeOut = pipeOut;
+	cmdTemp = createCmd( first );
+	cmdTemp->pipeOut = -1;
+	cmdTemp->pipeIn = -1;
 
 	cmds = malloc( sizeof( struct commands ) );
 
@@ -73,91 +78,142 @@ Commands CmdsInit( char *first, int pipeIn, int pipeOut )
 }
 
 
+// Inserts New Command into the Valid Given Commands structure
 void CmdsNext( Commands cmds, char *str )
 {
 	Cmd cur = createCmd( str );
-	Cmd prev;
-	int pipeFd[2];
 
 
 	if( !cmds || !(cmds->count) )
 		return;
 
-	prev = cmds->arrCmds[ cmds->count - 1];
+	cur->pipeIn = -1;
+	cur->pipeOut = -1;
 
-	cur->pipeOut = prev->pipeOut;
-
-	pipe( pipeFd );
-
-	prev->pipeOut = pipeFd[1];
-	cur->pipeIn = pipeFd[0];
-
-
-	cmds->arrCmds = realloc( cmds->arrCmds, sizeof( Cmd ) * (cmds->count++) );
+	cmds->arrCmds = realloc( cmds->arrCmds, sizeof( struct cmd ) * (cmds->count++) );
 	cmds->arrCmds[ cmds->count - 1] = cur;
 
 
 }
 
 
+// Executes the Commands in a Valid Given Commands structure
+// Features: Supports piping output, e.g. ' ls | wc -l'
 void CmdsExec( Commands cmds )
 {
 	int i;
-	Cmd cur, prev;
-	int pipeIn, pipeOut;
+	Cmd cur, prev, next;
+
 	int pipeFd[2];
+	int pid;
+	int nPipes;
+
 
 	if( !cmds || !(cmds->count) )
 		return;
 
+
+	// Building Pipes
+	nPipes = cmds->count - 1;
+	for( i = 0; i < nPipes; i++ ) {
+		pipe( pipeFd );
+
+		cur = cmds->arrCmds[ i ];
+		next = cmds->arrCmds[ i+1 ];
+
+		cur->pipeOut = pipeFd[0];
+		next->pipeIn = pipeFd[1];
+
+	}
+
+
 	for( i = 0; i < cmds->count; i++ ) {
 		cur = cmds->arrCmds[i];
 
-		if( fork() == 0 ) {	// Son
+		if( i )
+			prev = cmds->arrCmds[ i - 1];
 
-			if( i ) {        // Not First
-				dup2(prev->pipeOut, 0);
-//				close(prev->pipeIn);
-//				close(prev->pipeOut);
+		if( (i+1) < cmds->count )
+			next = cmds->arrCmds[ i + 1];
+
+
+		if( ( pid = fork() ) == 0 ) {	// Son
+
+			if( i ) {      // Not First
+				prev = cmds->arrCmds[ i - 1];
+				if (dup2( prev->pipeOut, STDIN_FILENO ) < 0 ) {
+					perror("Error Duplicating InputPipe");
+					exit(EXIT_FAILURE);
+				}
+
+
 			}
 
-			if( (i+1) < cmds->count ) {    // not Last
-//				close( cur->pipeIn );
-				dup2( cur->pipeOut, 1 );
-//				close( cur->pipeOut );
+
+			if( (i+1) < cmds->count ) {    // Not Last
+				next = cmds->arrCmds[ i + 1 ];
+				if (dup2( next->pipeIn, STDOUT_FILENO ) < 0 ) {
+					perror("Error Duplicating OutputPipe");
+					exit(EXIT_FAILURE);
+				}
+
+
 			}
 
-			execvp( cur->op, cur->args );
-			exit(EXIT_FAILURE);
+
+			if( execvp( cur->op, cur->args ) < 0 ) {
+				perror( "Error Executing Command" );
+				exit( EXIT_FAILURE );
+			}
+
+			exit(EXIT_SUCCESS);
 		}
-		else {	// Parent
+		else if( pid == -1 ) {	// Error Happened
+			perror( "Error Forking" );
+			exit( EXIT_FAILURE );
+		}
+		else {		// Parent, Closing used Pipes
 
-//			close( cur->pipeOut );
-			if( i ) {
-//				close(prev->pipeOut);
-//				close(prev->pipeIn);
-			}
 
-			if( i+1 < cmds->count)
-				prev = cur;
-			wait( NULL );
+			if( i )
+				close( prev->pipeOut );
+
+			if( (i+1) < cmds->count )
+				close( next->pipeIn );
 
 		}
 
 	}
 
+	// Parent Waits For Children
+	for( i = 0; i < cmds->count; i++ )
+		wait(NULL);
+
 }
 
 
+// Frees a Valid Given Commands structure
 void freeCommands( Commands cmds )
 {
-	int i;
+	int i,argCount,j;
+	Cmd cur;
 
-	for( i = cmds->count - 1; i >= 0 ; i-- ) {
 
-		free( cmds->arrCmds[i]->op );
-		free( cmds->arrCmds[i]->args );
-		free( cmds->arrCmds[i] );
+	if( !cmds )
+		return;
+
+	for( i = 0; i < cmds->count; i++ ) {
+		cur = cmds->arrCmds[i];
+
+		argCount = cur->argCount;
+		for( j = 0; j < argCount; j++ )
+			free( cur->args[j] );
+
+		free( cur->args );
+
+		free( cur->op );
+
+		free( cur );
 
 	}
 
@@ -166,6 +222,8 @@ void freeCommands( Commands cmds )
 
 }
 
+
+// Creates a Cmd(Command) structure with a Given String
 Cmd createCmd( char *str )
 {
 	Cmd cmd;
@@ -173,7 +231,7 @@ Cmd createCmd( char *str )
 	char *ctrl, *ctrl2;
 	int argCount = 0;
 
-	cmd = malloc( sizeof( Cmd ) );
+	cmd = malloc( sizeof( struct cmd ) );
 
 
 	strcpy( temp, str );
@@ -181,7 +239,6 @@ Cmd createCmd( char *str )
 	ptr = strtok_r( str, " ", &ctrl);
 	cmd->op = trim( ptr );
 	cmd->args = malloc( sizeof(char**));
-//	ptr = strchr( temp, ' ');
 	if( ctrl != NULL ) {
 		ptr = strtok_r(ctrl, " ", &ctrl2);
 		while (ptr != NULL) {
@@ -198,6 +255,9 @@ Cmd createCmd( char *str )
 	return cmd;
 }
 
+
+// Trims whitespaces at the front AND at the end
+// e.g. ' wc -r  ' -> 'wc -r'
 char * trim( char *in )
 {
 	int i, len;
@@ -224,54 +284,3 @@ char * trim( char *in )
 
 	return out;
 }
-
-/*
-int main( int argc, char **argv )
-{
-	int pipefd[2];
-	Cmd *cmds;
-	Cmd temp;
-	int nCmds, sizeCmds;
-
-	int i;
-
-
-	if( argc == 1 )
-		return 0;
-
-	nCmds = 1;
-	printf("hai");
-	sizeCmds = sizeof( struct cmd );
-
-	cmds = malloc( sizeCmds );
-
-	printf("hai");
-	for( i = 0; i < argc; i++ )
-	{
-		printf("hai");
-		if( strcmp( argv[i], "|" ) == 0 ) {
-
-			nCmds++;
-			sizeCmds += sizeof( struct cmd );
-			cmds = realloc( cmds, sizeCmds );
-
-			temp = cmds[ nCmds - 1 ];
-			temp->op = malloc( strlen( argv[i+1] ) );
-			strcpy( temp->op, argv[i+1] );
-
-		}
-		else {
-
-			temp = cmds[ nCmds - 1 ];
-			temp->args = realloc( temp->args,
-								  strlen( temp->args ) - 1 + strlen( argv[i] ) );
-			strcat( temp->args, argv[i] );
-
-		}
-
-	}
-
-	printf( "nCmds: %d", nCmds );
-
-	return 0;
-}*/
