@@ -4,6 +4,17 @@
 
 void checkBalance(int pipe, int outputPipe, int name);
 
+void sigHandler(int s)
+{
+  if (s == SIGPIPE)
+  {
+	  printf("Something went wrong, restarting\n");
+	  execlp("Client", "Client", NULL);
+	  exit(1);
+  }
+}
+
+
 int main()
 {
     /**/
@@ -13,6 +24,8 @@ int main()
     int stdinPipe, stdoutPipe;
     int answer = -1;
     int sF = 0;
+
+    signal(SIGPIPE, sigHandler);
 
     /*Get User Credentials*/
 
@@ -63,10 +76,11 @@ int main()
     fflush(stdin);
     while(answer)
     {
-        printf("What do you wish to do?\n1 - Input Commands\n2 - Check Balance\n3 - Update Balance\n0 - Exit\n");
+
         fflush(stdin);
         __fpurge(stdin);
         fflush(stdout);
+        printf("What do you wish to do?\n1 - Input Commands\n2 - Check Balance\n3 - Update Balance\n0 - Exit\n");
         sF = scanf("%d", &answer);
         if(sF)
             switch (answer)
@@ -153,14 +167,14 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
             i.msgId = MSG_MC_CLOSE;
             i.dataSize = -1;
             //memcpy(stB, &i, sizeof i);
-            write(inputPipe, &i, sizeof i);
+            //write(inputPipe, &i, sizeof i);
             return;
         } else{
 
-            i.dataSize = (int) (strlen(buff));
-            memcpy(stB, &i, sizeof i);
+            i.dataSize = (int) (strlen(buff) + 1);
+            //memcpy(stB, &i, sizeof i);
 
-            write(inputPipe, stB, sizeof i);
+            write(inputPipe, &i, sizeof i);
 
             write(inputPipe, buff, i.dataSize);
         }

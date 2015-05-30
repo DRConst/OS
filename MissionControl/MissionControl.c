@@ -10,6 +10,17 @@ void log(char *str)
     fclose(fp);
 }
 
+void sigHandler(int s)
+{
+  if (s == SIGPIPE)
+  {
+	  printf("Something went wrong, restarting\n");
+	  execlp("Client", "Client", NULL);
+	  exit(1);
+  }
+}
+
+
 /*TODO: Signal Handling*/
 typedef void (*sighandler_t)(int);
 int main()
@@ -27,6 +38,8 @@ int main()
     int userName = 0;
     ssize_t bytesRead;
     char buff[32];
+
+    signal(SIGPIPE, sigHandler);
 
     initPipes(&inputPipeFD, &outputPipeFD);
     initAccountingPipes(&accountingInputPipe, &accoutingOutputPipe);
@@ -51,7 +64,7 @@ int main()
                 initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, &stdinClient, &stdoutClient, userName);
                 log("User Pipes Inited\n");
                 dup2(STDOUT_FILENO, stdoutClient);
-                dup2(stdinClient, STDIN_FILENO);
+                //dup2(stdinClient, STDIN_FILENO);
                 clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe, userName);
             }
             else{
@@ -81,12 +94,12 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                     execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,userName,it.dataSize);
                     break;
                 case MSG_BAL_CHECK:
-                    printf("User %04x has a Balance of %f\n", userName, (bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe, userName)));
+                   // printf("User %04x has a Balance of %f\n", userName, (bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe, userName)));
                     write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_BAL_UPDATE:
                     read(inputClientMC, &bal, sizeof bal);
-                    printf("User %04x has a Balance of %f\n", userName, (bal = balanceUpdate(inputClientAcc, outputClientAcc,bal, userName)));
+                    //printf("User %04x has a Balance of %f\n", userName, (bal = balanceUpdate(inputClientAcc, outputClientAcc,bal, userName)));
                     write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_MC_CLOSE:
@@ -101,6 +114,7 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                     break;*/
                 default:
                     printf("Intent Not Recognized\n");
+                    exit(1);
                     break;
             }
         }
@@ -158,13 +172,13 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     accIntent ai;
     ai.msgId = MSG_ACC_RUN;
     ai.amount = 1.0f;
-    /*if((pid = fork()) == 0)/*TODO: Flip
+    if((pid = fork()) == 0)//TODO: Flip
     {
         while(!killFlag) {
-
+        	/*
             pipe(fd);
 
-            if(fork() != 0)
+            if(fork() == 0)
             {
                 close(fd[1]);
                 read(fd[0], psRet, sizeof psRet);
@@ -172,29 +186,26 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
 
                 close(fd[0]);
                 dup2(fd[1], STDOUT_FILENO);
-                sprintf(buff, "%d", pid);
-                execlp("pidstat", "pidstat","-p ", buff, NULL);
-            }
+                sprintf(buff, "%d", pid);*/
+                execlp("pidstat", "pidstat","p", buff, NULL);
+            //}
 
-            printf("%s\n", psRet);
-           // char *asd = strtok(psRet, "\n");
-             //= strtok(NULL, "\n");
-            //printf("%s\n", asd);
+            //printf("%s\n", psRet);
             sleep(1);
             killFlag = 1;
-            /*Calc Next Bill
+            //Calc Next Bill
         }
-        kill(pid, SIGKILL);
+        //kill(pid, SIGKILL);
         //exit(1);
 
-    }else{*/
+    }else{
         do{
             dataSize = read(inputClientMC, cmdString, dataSize);
         }while(dataSize <= 0);
         execStat(cmdString);
-        printf("Got intent with datasize of %d\n", dataSize);
-        exit(1);
-    //}
+        //printf("Got intent with datasize of %d\n", dataSize);
+        //exit(1);
+    }
 
 }
 
@@ -226,7 +237,6 @@ void initPipes(int *inputFD, int *outputFD)
 void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc, int *outputClientAcc, int *stdinClient, int *stdoutClient, int userName)
 {
     char buff[32];
-
     sprintf(buff , "/tmp/%04xInput.pipe", userName);
 
     if(mkfifo(buff, 0666) != 0)
