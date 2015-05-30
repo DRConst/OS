@@ -40,6 +40,8 @@ int main()
     char buff[32];
 
     signal(SIGPIPE, sigHandler);
+    //if(fork() == 0)
+    //	execlp("pidstat", "pidstat","-p", "1446", NULL);
 
     initPipes(&inputPipeFD, &outputPipeFD);
     initAccountingPipes(&accountingInputPipe, &accoutingOutputPipe);
@@ -166,33 +168,104 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     int killFlag = 0;
     int pid;
     int fd[2];
-    char psRet[1024];
+    char *psRet = malloc(1024);
     char buff[64];
     char *cmdString = malloc(dataSize + 1);
     accIntent ai;
     ai.msgId = MSG_ACC_RUN;
-    ai.amount = 1.0f;
-    if((pid = fork()) == 0)//TODO: Flip
+    char *auxStrTok;
+    char *ptr;
+    char *ctrl;
+    float usage;
+
+
+    do{
+    	dataSize = read(inputClientMC, cmdString, dataSize);
+	}while(dataSize <= 0);
+
+    pid =  execStat(cmdString);
+
+    pipe(fd);
+
+    if(fork() == 0)
+    {
+    	close(fd[0]);
+		dup2(fd[1], STDOUT_FILENO);
+		sprintf(buff, "%d\0", pid);
+		execlp("pidstat", "pidstat","-T", "ALL", "-p", buff, NULL);
+    }else
+    {
+    	 close(fd[1]);
+		read(fd[0], psRet, 1024);
+		printf("%s\n", psRet);
+		auxStrTok = strdup( psRet );
+		strtok( auxStrTok, "\n");//Gobble Up Trash
+		strtok( NULL, "\n");
+		ptr = strtok( NULL, "\n");
+		auxStrTok = ptr;
+		ptr = strtok( auxStrTok, " ");//Gobble up date
+		ptr = strtok( NULL, " ");//UID
+		ptr = strtok( NULL, " ");//PID
+		ptr = strtok( NULL, " ");//Usr
+		ptr = strtok( NULL, " ");//Sys
+		if(ptr)
+		{
+			ptr[strlen(ptr)] = '\0';
+			usage = atof(ptr);
+			ai.amount = usage;
+			write(outputClientAcc, &ai, sizeof ai);//Warn Acc of Usage
+			if(ai.amount > 0)
+				printf("%f CPU\n", ai.amount);
+			read(inputClientAcc, &killFlag, sizeof killFlag);
+		}//else process was too fast
+    }
+
+    /*
+    if((pid = fork()) != 0)//TODO: Flip
     {
         while(!killFlag) {
-        	/*
+
             pipe(fd);
 
-            if(fork() == 0)
+            if(fork() != 0)
             {
+
                 close(fd[1]);
-                read(fd[0], psRet, sizeof psRet);
-            } else{
+                read(fd[0], psRet, 1024);
+                printf("%s\n", psRet);
+                auxStrTok = strdup( psRet );
+                strtok( auxStrTok, "\n");//Gobble Up Trash
+                strtok( NULL, "\n");
+                ptr = strtok( NULL, "\n");
+                auxStrTok = ptr;
+                ptr = strtok( auxStrTok, " ");//Gobble up date
+                ptr = strtok( NULL, " ");//UID
+                ptr = strtok( NULL, " ");//PID
+                ptr = strtok( NULL, " ");//Usr
+                ptr = strtok( NULL, " ");//Sys
+                if(ptr)
+                {
+					ptr[strlen(ptr)] = '\0';
+					usage = atof(ptr);
+					ai.amount = usage;
+					write(outputClientAcc, &ai, sizeof ai);//Warn Acc of Usage
+					if(ai.amount > 0)
+						printf("%f CPU\n", ai.amount);
+					read(inputClientAcc, &killFlag, sizeof killFlag);
+                }//else process was too fast
+
+            }
+            else{
 
                 close(fd[0]);
                 dup2(fd[1], STDOUT_FILENO);
-                sprintf(buff, "%d", pid);*/
-                execlp("pidstat", "pidstat","p", buff, NULL);
-            //}
+        		sprintf(buff, "%d\0", pid);
+                execlp("pidstat", "pidstat","-T", "CHILD", "-p", buff, NULL);
+            }
 
             //printf("%s\n", psRet);
             sleep(1);
-            killFlag = 1;
+            //killFlag = 1;
             //Calc Next Bill
         }
         //kill(pid, SIGKILL);
@@ -205,7 +278,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
         execStat(cmdString);
         //printf("Got intent with datasize of %d\n", dataSize);
         //exit(1);
-    }
+    }*/
 
 }
 

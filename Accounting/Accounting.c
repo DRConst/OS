@@ -13,7 +13,7 @@ int main()
     {
         bytesRead = read(inputPipeFD, &username, sizeof(int));
 
-        if(bytesRead > 0 && fork() == 0)//Is Child
+        if(bytesRead > 0 && fork() != 0)//Is Child
         {
             initMCPipes(&inputMCFD, &outputMCFD, username);
 
@@ -81,7 +81,8 @@ void mCHandler(int inputMCFD, int outputMCFD, int username)
 {
     accIntent acIt;
     int bytesRead;
-    float balance;
+    float balance, delta;
+    int kill = 0;
     while(1)
     {
         bytesRead = read(outputMCFD, &acIt, sizeof(acIt));
@@ -99,7 +100,9 @@ void mCHandler(int inputMCFD, int outputMCFD, int username)
                 //balanceUpdate(username, acIt.amount);
                 break;
             case MSG_ACC_RUN:
-                sendReply(outputMCFD, balanceRun(username, acIt.amount));
+            	printf("%f CPU", acIt.amount);
+                (kill = (balanceUpdate(username, acIt.amount) <= 0));
+                write(inputMCFD, &kill, sizeof kill);
                 break;
             case MSG_ACC_DISC:
                 printf("User %04x has Disconnected", username);
@@ -172,13 +175,4 @@ int balanceRun (int username, float amount)
         balanceUpdate(username, amount);
 
     return 1;
-}
-
-void sendReply(int outputMCFD, int reply)
-{
-    char ch[2];
-
-    sprintf(ch, "%d", reply);
-
-    write(outputMCFD, ch, 2);
 }
