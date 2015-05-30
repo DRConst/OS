@@ -51,8 +51,10 @@ int main()
         while(1)
         {
             memset(b, '\0', sizeof b);
-            read(stdoutPipe, b, sizeof b);
-            printf("%s\n", b);
+            if(read(stdoutPipe, b, sizeof b) > 0)
+            	printf("%s\n", b);
+            else
+            	usleep(100);
             if(getppid() == 1)
                 exit(0);
         }
@@ -123,13 +125,14 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
 
     char stB[64];
     printf("You are now connected to the server, Ctlr+D disconnects\n");
-    Intent i;
-    i.msgId = MSG_EXEC_CMD;
 
     //memcpy(stB, &i, sizeof i);
     //write(inputPipe, stB, sizeof i)
     while(1)
     {
+
+        Intent i;
+        i.msgId = MSG_EXEC_CMD;
         char buff[1024];
         char null[1];
         null[0] = '\0';
@@ -137,6 +140,7 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
         //scanf("%s", buff);
         do{
             //fflush(stdout);
+        	memset(buff, '\0', sizeof buff);
             fgets(buff, 64, stdin);
         }while((asd = strcmp(buff, " \n")) <= 0);
 
@@ -148,8 +152,8 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
         {
             i.msgId = MSG_MC_CLOSE;
             i.dataSize = -1;
-            memcpy(stB, &i, sizeof i);
-            //write(inputPipe, stB, sizeof i);
+            //memcpy(stB, &i, sizeof i);
+            write(inputPipe, &i, sizeof i);
             return;
         } else{
 
