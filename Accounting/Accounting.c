@@ -85,7 +85,7 @@ void mCHandler(int inputMCFD, int outputMCFD, int username)
     while(1)
     {
         bytesRead = read(outputMCFD, &acIt, sizeof(acIt));
-        if(bytesRead >= 0)
+        if(bytesRead == sizeof acIt)
         switch (acIt.msgId)
         {
             case MSG_ACC_CHECK:
