@@ -40,4 +40,33 @@ typedef struct accIntent{
     int msgId;
     float amount;
 }accIntent;
+
+typedef struct cmd {
+
+    char *op;
+    char **args;
+    int pipeIn, pipeOut;
+    int argCount;
+} *Cmd;
+
+typedef struct commands {
+    Cmd *arrCmds;
+    int count;
+} *Commands;
+
+
+void auxExec( char *input );
+pid_t execStat( char *strCmd );
+Cmd createCmd( char *str );
+Commands CmdsInit( char *first );
+void CmdsNext( Commands cmds, char *str );
+void CmdsExec( Commands cmds );
+void freeCommands( Commands cmds );
+
+char *trim( char *in );
+
+
+
 #endif //MISSIONCONTROL_MAIN_H
+
+
