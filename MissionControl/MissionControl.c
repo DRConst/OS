@@ -60,17 +60,17 @@ int main()
             printf("Client ");
             printf(buff);
             printf(" Connected\n");
-            if(fork() != 0)//Is Child
+            if(fork() == 0)//Is Child
             {
                 write(accountingInputPipe, &userName, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
                 initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, &stdinClient, &stdoutClient, userName);
-                log("User Pipes Inited\n");
+                printf("User Pipes Inited\n");
                 dup2(STDOUT_FILENO, stdoutClient);
                 //dup2(stdinClient, STDIN_FILENO);
                 clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe, userName);
             }
             else{
-                exit(1);
+                //exit(1);
             }
 
         }
@@ -96,12 +96,12 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                     execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,userName,it.dataSize);
                     break;
                 case MSG_BAL_CHECK:
-                   // printf("User %04x has a Balance of %f\n", userName, (bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe, userName)));
+                    bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe, userName);
                     write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_BAL_UPDATE:
                     read(inputClientMC, &bal, sizeof bal);
-                    //printf("User %04x has a Balance of %f\n", userName, (bal = balanceUpdate(inputClientAcc, outputClientAcc,bal, userName)));
+                    bal = balanceUpdate(inputClientAcc, outputClientAcc,bal, userName);
                     write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_MC_CLOSE:
