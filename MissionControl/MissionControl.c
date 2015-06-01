@@ -5,8 +5,9 @@
 #include "MissionControl.h"
 
 FILE *fp;
-void log(char *str)
-{
+
+
+void logMC(char *str) {
     fp = fopen("/tmp/log", "a");
     fwrite(str,strlen(str), 1, fp);;
     fclose(fp);
@@ -36,7 +37,10 @@ int main()
     int inputClientMC, outputClientMC, inputClientAcc, outputClientAcc, stdoutClient, stdinClient;
     //</editor-fold>
 
-    int userName = 0;
+    int userHex = 0;
+    int login = 0;
+    int userSize = 0, pwSize = 0;
+    char *userName, *pw;
     ssize_t bytesRead;
     char buff[32];
 
@@ -49,26 +53,52 @@ int main()
 
     while(1)
     {
-        bytesRead = read(inputPipeFD, buff, 32);
+        bytesRead = read(inputPipeFD, &userSize, sizeof userSize);
         sleep(1);
-        userName = atoi(buff);
-        login(userName);
 
         //printf("asd");
         if(bytesRead > 0)
         {
-            log("Client Connected\n");
-            printf("Client ");
-            printf(buff);
-            printf(" Connected\n");
-            if(fork() != 0)//Is Child
+            userName = malloc(userSize);
+            do{
+                bytesRead = read(inputPipeFD, userName, userSize);
+            }while(bytesRead <= 0);
+            logMC("Client Connected\n");
+
+            do{
+                bytesRead = read(inputPipeFD, &pwSize, sizeof pwSize);
+            }while(bytesRead <= 0);
+            if(pwSize)
             {
-                write(accountingInputPipe, &userName, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
-                initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, &stdinClient, &stdoutClient, userName);
-                printf("User Pipes Inited\n");
-                dup2(STDOUT_FILENO, stdoutClient);
-                //dup2(stdinClient, STDIN_FILENO);
-                clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe, userName);
+                pw = malloc(pwSize);
+                do{
+                    bytesRead = read(inputPipeFD, pw, pwSize);
+                }while(bytesRead <= 0);
+            }
+            else{
+                pw = malloc(1);
+                pw = "";
+            }
+            if(fork() == 0)//Is Child
+            {
+                write(accountingInputPipe, &userSize, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
+                write(accountingInputPipe, userName, userSize); /*Warn Accounting of New Connection to Fork*/
+
+
+                initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, &stdinClient, &stdoutClient,
+                              userName);
+
+                if(doLogin(userName, pw) != E_AUTH_SUCCSS)
+                {
+                    printf("Authentication Failed\n");
+                    write(outputClientMC, &login, sizeof login);
+                    exit(1);
+                } else{
+                    login = 1;
+                    write(outputClientMC, &login, sizeof login);
+                }
+                clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe,
+                              userName);
             }
             else{
                 //exit(1);
@@ -81,33 +111,34 @@ int main()
 }
 
 
-void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int accountingInputPipe, int accoutingOutputPipe, int userName)
+void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int accountingInputPipe, int accoutingOutputPipe, char *userName)
 {
     Intent it;
     int cnt;
     int shouldClose = 0;
     float bal;
     do{
-        cnt = read(inputClientMC, &it, sizeof(it));
+        cnt = read(inputClientMC, &it.msgId, sizeof(it.msgId));
         if(cnt > 0)
         {
+            read(inputClientMC, &it.dataSize, sizeof(it.dataSize));
             switch (it.msgId)
             {
                 case MSG_EXEC_CMD:
-                    execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,userName,it.dataSize);
+                    execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,it.dataSize, userName);
                     break;
                 case MSG_BAL_CHECK:
-                    bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe, userName);
+                    bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe);
                     write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_BAL_UPDATE:
                     read(inputClientMC, &bal, sizeof bal);
-                    bal = balanceUpdate(inputClientAcc, outputClientAcc,bal, userName);
+                    bal = balanceUpdate(inputClientAcc, outputClientAcc,bal);
                     write(outputClientMC, &bal, sizeof bal);
                     break;
                 case MSG_MC_CLOSE:
-                    log("Client Disconnected");
-                    printf("User %04x has logged out\n", userName);
+                    logMC("Client Disconnected");
+                    printf("User %s has logged out\n", userName);
                     it.msgId = MSG_ACC_DISC;
                     write(outputClientAcc, &it, sizeof it);
                     close(outputClientAcc);
@@ -118,7 +149,7 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                     break;*/
                 default:
                     printf("Intent Not Recognized\n");
-                    exit(1);
+                    //exit(1);
                     break;
             }
         }
@@ -127,15 +158,12 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
 }
 
 
-float balanceCheck(int inputClientAcc, int outputClientAcc, int accountingInputPipe, int userName)
+float balanceCheck(int inputClientAcc, int outputClientAcc, int accountingInputPipe)
 {
     /*Talk to Accounting*/
     Intent i;
     i.msgId = MSG_ACC_CHECK;
-    char buff[64];
     float bal;
-    sprintf(buff, "%d", userName);
-
 
     write(outputClientAcc, &i, sizeof i);/*Write out Message to Accounting On the Exclusive Pipe*/
 
@@ -145,17 +173,13 @@ float balanceCheck(int inputClientAcc, int outputClientAcc, int accountingInputP
 
 }
 
-float balanceUpdate(int inputClientAcc, int outputClientAcc, float bal, int userName)
+float balanceUpdate(int inputClientAcc, int outputClientAcc, float bal)
 {
     /*Talk to Accounting*/
     Intent i;
     i.msgId = MSG_ACC_UPDATE;
-    char buff[64];
-    sprintf(buff, "%d", userName);
-
 
     write(outputClientAcc, &i, sizeof i);/*Write out Message to Accounting On the Exclusive Pipe*/
-
 
     write(outputClientAcc, &bal, sizeof bal);
 
@@ -165,7 +189,7 @@ float balanceUpdate(int inputClientAcc, int outputClientAcc, float bal, int user
 
 }
 
-void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int userName, int dataSize)
+void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int dataSize, char *userName)
 {
     int killFlag = 0;
     int pid;
@@ -185,15 +209,16 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     	dataSize = read(inputClientMC, cmdString, dataSize);
 	}while(dataSize <= 0);
 
-    pid =  execStat(cmdString);
+    pid =  execStat(cmdString, userName);
 
-    pipe(fd);
+    //pipe(fd);
 
+    /*
     if(fork() == 0)
     {
     	close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
-		sprintf(buff, "/proc/%d/stat\0", pid);
+		sprintf(buff, "cat /proc/%d/stat", pid);
 		//execlp("pidstat", "pidstat","-T", "ALL", "-p", buff, NULL);
         execStat(buff);
     }else
@@ -213,7 +238,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
 		ptr = strtok( NULL, " ");//Sys
 		if(ptr)
 		{
-			ptr[strlen(ptr)] = '\0';
+            ptr[strlen(ptr)] = '\0';
 			usage = atof(ptr);
 			ai.amount = usage;
 			write(outputClientAcc, &ai, sizeof ai);//Warn Acc of Usage
@@ -221,66 +246,6 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
 				printf("%f CPU\n", ai.amount);
 			read(inputClientAcc, &killFlag, sizeof killFlag);
 		}//else process was too fast
-    }
-
-    /*
-    if((pid = fork()) != 0)//TODO: Flip
-    {
-        while(!killFlag) {
-
-            pipe(fd);
-
-            if(fork() != 0)
-            {
-
-                close(fd[1]);
-                read(fd[0], psRet, 1024);
-                printf("%s\n", psRet);
-                auxStrTok = strdup( psRet );
-                strtok( auxStrTok, "\n");//Gobble Up Trash
-                strtok( NULL, "\n");
-                ptr = strtok( NULL, "\n");
-                auxStrTok = ptr;
-                ptr = strtok( auxStrTok, " ");//Gobble up date
-                ptr = strtok( NULL, " ");//UID
-                ptr = strtok( NULL, " ");//PID
-                ptr = strtok( NULL, " ");//Usr
-                ptr = strtok( NULL, " ");//Sys
-                if(ptr)
-                {
-					ptr[strlen(ptr)] = '\0';
-					usage = atof(ptr);
-					ai.amount = usage;
-					write(outputClientAcc, &ai, sizeof ai);//Warn Acc of Usage
-					if(ai.amount > 0)
-						printf("%f CPU\n", ai.amount);
-					read(inputClientAcc, &killFlag, sizeof killFlag);
-                }//else process was too fast
-
-            }
-            else{
-
-                close(fd[0]);
-                dup2(fd[1], STDOUT_FILENO);
-        		sprintf(buff, "%d\0", pid);
-                execlp("pidstat", "pidstat","-T", "CHILD", "-p", buff, NULL);
-            }
-
-            //printf("%s\n", psRet);
-            sleep(1);
-            //killFlag = 1;
-            //Calc Next Bill
-        }
-        //kill(pid, SIGKILL);
-        //exit(1);
-
-    }else{
-        do{
-            dataSize = read(inputClientMC, cmdString, dataSize);
-        }while(dataSize <= 0);
-        execStat(cmdString);
-        //printf("Got intent with datasize of %d\n", dataSize);
-        //exit(1);
     }*/
 
 }
@@ -310,10 +275,10 @@ void initPipes(int *inputFD, int *outputFD)
 
 }
 
-void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc, int *outputClientAcc, int *stdinClient, int *stdoutClient, int userName)
+void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc, int *outputClientAcc, int *stdinClient, int *stdoutClient, char *userName)
 {
     char buff[32];
-    sprintf(buff , "/tmp/%04xInput.pipe", userName);
+    sprintf(buff , "/tmp/%sInput.pipe", userName);
 
     if(mkfifo(buff, 0666) != 0)
     {
@@ -327,7 +292,7 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
     *inputClientMC = open(buff , O_RDONLY);/*Will Block Until Client Catches Up*/
     //dup2(STDIN_FILENO, *inputFD);
 
-    sprintf(buff , "/tmp/%04xOutput.pipe", userName);
+    sprintf(buff , "/tmp/%sOutput.pipe", userName);
 
     if(mkfifo(buff, 0666) != 0)
     if(errno != EEXIST)
@@ -339,7 +304,7 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
     *outputClientMC = open(buff , O_WRONLY);/*Will Block Until Client Catches Up*/
     //dup2(*outputClientMC, STDOUT_FILENO);
 
-    sprintf(buff , "/tmp/%04xAccountingInput.pipe", userName);
+    sprintf(buff , "/tmp/%sAccountingInput.pipe", userName);
 
 
     if(mkfifo(buff, 0666) != 0)
@@ -354,7 +319,7 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
     *inputClientAcc = open(buff , O_RDONLY);
     //dup2(STDIN_FILENO, *inputFD);
 
-    sprintf(buff , "/tmp/%04xAccountingOutput.pipe", userName);
+    sprintf(buff , "/tmp/%sAccountingOutput.pipe", userName);
 
     if(mkfifo(buff, 0666) != 0)
     if(errno != EEXIST)
@@ -365,7 +330,7 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
 
     *outputClientAcc = open(buff , O_WRONLY);
 
-    sprintf(buff , "/tmp/%04xStdin.pipe", userName);
+    sprintf(buff , "/tmp/%sStdin.pipe", userName);
 
     if(mkfifo(buff, 0666) != 0)
     if(errno != EEXIST)
@@ -376,7 +341,7 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
 
     *stdinClient = open(buff , O_RDONLY);
 
-    sprintf(buff , "/tmp/%04xStdout.pipe", userName);
+    sprintf(buff , "/tmp/%sStdout.pipe", userName);
 
     if(mkfifo(buff, 0666) != 0)
     if(errno != EEXIST)
@@ -389,6 +354,7 @@ void initUserPipes(int *inputClientMC, int *outputClientMC, int *inputClientAcc,
     *stdoutClient = open(buff , O_WRONLY);
     //dup2(STDOUT_FILENO, *stdoutClient);
     dup2(*stdoutClient , STDOUT_FILENO);
+    dup2(*stdoutClient , STDERR_FILENO);
 }
 
 void initAccountingPipes(int *accountingInputPipe, int *accountingOutputPipe)
@@ -416,7 +382,7 @@ void initAccountingPipes(int *accountingInputPipe, int *accountingOutputPipe)
 
 
 // Execs Given StringCommand via auxExec creating a process, returns that process's PID for stats, 0 if strCmd is not valid
-pid_t execStat( char *strCmd )
+pid_t execStat( char *strCmd, char *user )
 {
     pid_t p;
 
@@ -426,7 +392,7 @@ pid_t execStat( char *strCmd )
 
     // Hooking for Stats
     if( ( p = fork() ) == 0 ) {	// Son
-        auxExec( strCmd );
+        auxExec(strCmd, user);
         exit( EXIT_SUCCESS );
     }
 
@@ -436,7 +402,7 @@ pid_t execStat( char *strCmd )
 
 // Auxiliary Functionary parsing strCmd and actually dealing with Cmd/Commands structures
 // At this point strCmd has been validated.
-void auxExec( char *input )
+void auxExec(char *input, char *user)
 {
     char *auxStrTok;
     Commands cmds = NULL;
@@ -460,7 +426,7 @@ void auxExec( char *input )
 
     free( auxStrTok );
 
-    CmdsExec( cmds );
+    CmdsExec( cmds, user );
 
     freeCommands( cmds );
 }
@@ -573,8 +539,15 @@ void CmdsNext( Commands cmds, char *str )
 
 // Executes the Commands in a Valid Given Commands structure
 // Features: Supports piping output, e.g. ' ls | wc -l'
-void CmdsExec( Commands cmds )
+void CmdsExec( Commands cmds, char *user )
 {
+
+    char  usrEnv[strlen(user) + sizeof("LOGNAME=")];
+    sprintf(usrEnv, "LOGNAME=%s", user);
+    char  usrEnv2[strlen(user) + sizeof("USER=")];
+    sprintf(usrEnv2, "USER=%s", user);
+    char *envp[] = {usrEnv, usrEnv2, NULL};
+
     int i;
     Cmd cur, prev, next;
 
@@ -634,8 +607,7 @@ void CmdsExec( Commands cmds )
 
             }
 
-
-            if( execvp( cur->op, cur->args ) < 0 ) {
+            if( execvpe( cur->op, cur->args, envp ) < 0 ) {
                 perror( "Error Executing Command" );
                 exit( EXIT_FAILURE );
             }
@@ -694,4 +666,53 @@ void freeCommands( Commands cmds )
     free( cmds->arrCmds );
     free( cmds );
 
+}
+
+int doLogin( char *uName, char *pwd )
+{
+    int ret = 0;
+    struct passwd *userPwd;
+    struct spwd *saltPwd;
+    //struct crypt_data data;
+    char *secure;
+
+    if( !uName || !strlen( uName ) )
+        return E_AUTH_PARAMS;
+
+    if( !pwd )
+        return E_AUTH_PARAMS;
+
+
+    userPwd = getpwnam( uName );
+    if( userPwd == NULL ) {
+        perror("Couldn't Access Password");
+        return E_AUTH_ACCESS;
+    }
+
+    saltPwd = getspnam( uName );
+    if( ( saltPwd == NULL ) && ( errno == EACCES ) ) {
+        perror( "Permissions Error" );
+        return E_AUTH_ACCESS;
+    }
+
+    userPwd->pw_passwd = saltPwd->sp_pwdp;
+
+    //data.initialized = 0;
+
+    //secure = crypt_r( pwd, userPwd->pw_passwd, &data );
+    secure = crypt( pwd, userPwd->pw_passwd );
+    memset( pwd, '\0', strlen( pwd ) + 1);
+
+    if( secure == NULL ) {
+        perror( "Error Encrypting Password" );
+        return E_AUTH_FAILED;
+    }
+
+    if( strcmp( secure, userPwd->pw_passwd ) == 0 ) {
+        perror( "Incorrect Password" );
+        return E_AUTH_INCORR;
+    }
+
+
+    return E_AUTH_SUCCSS;
 }

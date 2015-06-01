@@ -18,8 +18,10 @@ void sigHandler(int s)
 int main()
 {
     /**/
-    int userName  = 123;
+    char userName[32], pw[32];
+    int userSize;
     char buff[32];
+    int login;
     int registerPipe, inputPipe, outputPipe;/*Input and Output Refer to MissionControl*/
     int stdinPipe, stdoutPipe;
     int answer = -1;
@@ -30,33 +32,52 @@ int main()
     /*Get User Credentials*/
 
     printf("Welcome, Please Enter Your Username (31 Char Limit): ");
-    scanf("%d", &userName);
+    scanf("%s", userName);
+    userSize = strlen(userName) + 1;
     printf("\n");
 
     /*END*/
 
     /*Warn the Server of Client*/
-    sprintf(buff, "%d", userName);
     registerPipe = open("/tmp/missionControlInput.pipe", O_WRONLY);
-    write(registerPipe, buff, 4);
+    write(registerPipe, &userSize, sizeof userSize);
+    write(registerPipe, userName, userSize);
+
+    printf("Welcome, Please Enter Your Password (31 Char Limit | Insert | if N/A): ");
+    scanf("%s", pw);
+    userSize = strlen(pw) + 1;
+    if(userSize == 1)
+    {
+        userSize = 0;
+        write(registerPipe, &userSize, sizeof userSize);
+    }
+    else{
+        write(registerPipe, &userSize, sizeof userSize);
+        write(registerPipe, pw, userSize);
+    }
+
 
     /*Get the pipes to the server*/
-    sprintf(buff, "/tmp/%04xInput.pipe", userName);
+    sprintf(buff, "/tmp/%sInput.pipe", userName);
     do{
         inputPipe = open( buff , O_WRONLY);
     }
     while(inputPipe <= 0);/*Hold Until the Server Creates the Pipe*/
-    sprintf(buff, "/tmp/%04xOutput.pipe", userName);
+    sprintf(buff, "/tmp/%sOutput.pipe", userName);
     do{
         outputPipe = open( buff , O_RDONLY);
     }
     while(outputPipe <= 0);/*Hold Until the Server Creates the Pipe*/
 
-    sprintf(buff , "/tmp/%04xStdin.pipe", userName);
+    sprintf(buff , "/tmp/%sStdin.pipe", userName);
+    do {
     stdinPipe = open(buff, O_WRONLY);
-
-    sprintf(buff , "/tmp/%04xStdout.pipe", userName);
-    stdoutPipe = open(buff, O_RDONLY);
+    }while(stdinPipe <= 0);/*Hold Until the Server Creates the Pipe*/
+    //dup2(STDIN_FILENO, stdinPipe);
+    sprintf(buff , "/tmp/%sStdout.pipe", userName);
+    do {
+        stdoutPipe = open(buff, O_RDONLY);
+    }while(stdoutPipe <= 0);/*Hold Until the Server Creates the Pipe*/
 
     if(fork() == 0)/*Replace with propper STDOUT routing*/
     {
@@ -73,13 +94,18 @@ int main()
         }
 
     }
+
+    read(outputPipe, &login, sizeof login);
+    if(!login)
+       exit(1);
+
     fflush(stdin);
     while(answer)
     {
 
-        fflush(stdin);
-        __fpurge(stdin);
-        fflush(stdout);
+        //fflush(stdin);
+        //__fpurge(stdin);
+        //fflush(stdout);
         printf("What do you wish to do?\n1 - Input Commands\n2 - Check Balance\n3 - Update Balance\n0 - Exit\n");
         sF = scanf("%d", &answer);
         if(sF)
@@ -154,10 +180,11 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
 
     //memcpy(stB, &i, sizeof i);
     //write(inputPipe, stB, sizeof i)
+    Intent i;
     while(1)
     {
 
-        Intent i;
+        memset(&i,0,sizeof i);
         i.msgId = MSG_EXEC_CMD;
         char buff[1024];
         char null[1];
@@ -186,7 +213,10 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
             i.dataSize = (int) (strlen(buff) + 1);
             //memcpy(stB, &i, sizeof i);
 
-            write(inputPipe, &i, sizeof i);
+            if(i.msgId != MSG_EXEC_CMD)
+                printf("how");
+            write(inputPipe, &i.msgId, sizeof i.msgId);
+            write(inputPipe, &i.dataSize, sizeof i.dataSize);
 
             write(inputPipe, buff, i.dataSize);
         }

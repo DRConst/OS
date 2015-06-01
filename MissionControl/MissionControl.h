@@ -10,6 +10,9 @@
 #include <signal.h>
 #include "stdio.h"
 #include "stdlib.h"
+#include <pwd.h>
+#include <crypt.h>
+#include <shadow.h>
 
 #define MSG_EXEC_CMD 0
 #define MSG_BAL_CHECK 1
@@ -21,17 +24,23 @@
 #define MSG_ACC_RUN 16
 #define MSG_ACC_DISC 32
 
+#define E_AUTH_SUCCSS	0
+#define E_AUTH_PARAMS	1
+#define E_AUTH_ACCESS	2
+#define E_AUTH_FAILED	4
+#define E_AUTH_INCORR	8
 
 
+void logMC(char *str);
 int main();
 void initPipes(int *inputFD, int *outputFD);
-void initUserPipes(int *inputMC, int *outputMC, int *inputAcc, int *outputAcc,int *stdinClient, int *stdoutClient, int userName);
-void login(int username){};
-void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int accountingInputPipe, int accoutingOutputPipe, int userName);
-void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int userName, int dataSize);
-float balanceCheck(int inputClientAcc, int outputClientAcc, int accountingInputPipe, int userName);
-float balanceUpdate(int inputClientAcc, int outputClientAcc, float bal, int userName);
+void initUserPipes(int *inputMC, int *outputMC, int *inputAcc, int *outputAcc,int *stdinClient, int *stdoutClient, char *userName);
+void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int accountingInputPipe, int accoutingOutputPipe, char *userName);
+void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int outputClientAcc, int dataSize, char *userName);
+float balanceCheck(int inputClientAcc, int outputClientAcc, int accountingInputPipe);
+float balanceUpdate(int inputClientAcc, int outputClientAcc, float bal);
 void initAccountingPipes(int *accountingInputPipe, int *accountingOutputPipe);
+int doLogin( char *uName, char *pwd );
 
 typedef struct intent{
     int msgId, dataSize;
@@ -55,12 +64,12 @@ typedef struct commands {
 } *Commands;
 
 
-void auxExec( char *input );
-pid_t execStat( char *strCmd );
+void auxExec(char *input, char *user);
+pid_t execStat( char *strCmd , char *usr);
 Cmd createCmd( char *str );
 Commands CmdsInit( char *first );
 void CmdsNext( Commands cmds, char *str );
-void CmdsExec( Commands cmds );
+void CmdsExec( Commands cmds , char *usr);
 void freeCommands( Commands cmds );
 
 char *trim( char *in );

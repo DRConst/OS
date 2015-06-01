@@ -5,19 +5,22 @@ int main()
 {
     int inputPipeFD, outputPipeFD;
     int inputMCFD, outputMCFD;
-    int bytesRead, username;
+    int bytesRead, userSize;
+    char *userName;
 
     initPipes(&inputPipeFD, &outputPipeFD);
 
     while(1)
     {
-        bytesRead = read(inputPipeFD, &username, sizeof(int));
-
-        if(bytesRead > 0 && fork() != 0)//Is Child
+        bytesRead = read(inputPipeFD, &userSize, sizeof(int));
+        userName = malloc(userSize);
+        read(inputPipeFD, userName, userSize);
+        sleep(1);
+        if(bytesRead > 0 && fork() == 0)//Is Child
         {
-            initMCPipes(&inputMCFD, &outputMCFD, username);
+            initMCPipes(&inputMCFD, &outputMCFD, userName);
 
-            mCHandler(inputMCFD, outputMCFD, username);
+            mCHandler(inputMCFD, outputMCFD, userName);
         }
     }
 
@@ -44,12 +47,12 @@ void initPipes(int *inputFD, int *outputFD)
 
 }
 
-void initMCPipes(int *inputFD, int *outputFD, int username)
+void initMCPipes(int *inputFD, int *outputFD, char *userName)
 {
 
     char buff[32];
 
-    sprintf(buff , "/tmp/%04xAccountingInput.pipe", username);
+    sprintf(buff , "/tmp/%sAccountingInput.pipe", userName);
 
 
     if(mkfifo(buff, 0666) != 0)
@@ -64,7 +67,7 @@ void initMCPipes(int *inputFD, int *outputFD, int username)
     *inputFD = open(buff , O_WRONLY);/*Read and Write Direction Are Dictated Towards the MC*/
     //dup2(STDIN_FILENO, *inputFD);
 
-    sprintf(buff , "/tmp/%04xAccountingOutput.pipe", username);
+    sprintf(buff , "/tmp/%sAccountingOutput.pipe", userName);
 
     if(mkfifo(buff, 0666) != 0)
     if(errno != EEXIST)
@@ -77,7 +80,7 @@ void initMCPipes(int *inputFD, int *outputFD, int username)
     //dup2(STDOUT_FILENO, *outputFD);
 }
 
-void mCHandler(int inputMCFD, int outputMCFD, int username)
+void mCHandler(int inputMCFD, int outputMCFD, char *userName)
 {
     accIntent acIt;
     int bytesRead;
@@ -86,26 +89,27 @@ void mCHandler(int inputMCFD, int outputMCFD, int username)
     while(1)
     {
         bytesRead = read(outputMCFD, &acIt, sizeof(acIt));
+        usleep(100);
         if(bytesRead == sizeof acIt)
         switch (acIt.msgId)
         {
             case MSG_ACC_CHECK:
-                printf("User %04x has a Balance of %f\n", username, (balance = balanceCheck(username)));
+                printf("User %s has a Balance of %f\n", userName, (balance = balanceCheck(userName)));
                 write(inputMCFD, &balance, sizeof(float));
                 break;
             case MSG_ACC_UPDATE:
                 read(outputMCFD, &balance, sizeof balance);
-                printf("User %04x has a Balance of %f\n", username, (balance = balanceUpdate(username, balance)));
+                printf("User %s has a Balance of %f\n", userName, (balance = balanceUpdate(userName, balance)));
                 write(inputMCFD, &balance, sizeof(float));
-                //balanceUpdate(username, acIt.amount);
+                //balanceUpdate(userName, acIt.amount);
                 break;
             case MSG_ACC_RUN:
             	printf("%f CPU", acIt.amount);
-                (kill = (balanceUpdate(username, acIt.amount) <= 0));
+                (kill = (balanceUpdate(userName, acIt.amount) <= 0));
                 write(inputMCFD, &kill, sizeof kill);
                 break;
             case MSG_ACC_DISC:
-                printf("User %04x has Disconnected", username);
+                printf("User %s has Disconnected", userName);
                 close(inputMCFD);
                 close(outputMCFD);
                 exit(0);
@@ -118,13 +122,13 @@ void mCHandler(int inputMCFD, int outputMCFD, int username)
     }
 }
 
-float balanceCheck(int username)
+float balanceCheck(char *userName)
 {
     char buff[32];
     float balance;
     FILE *fp;
 
-    sprintf(buff , "/tmp/%04x.bal", username);
+    sprintf(buff , "/tmp/%04x.bal", userName);
 
     if((fp = fopen(buff,"r")) != NULL)
     {
@@ -138,16 +142,16 @@ float balanceCheck(int username)
     return balance;
 }
 
-float balanceUpdate(int username, float amount)
+float balanceUpdate(char *userName, float amount)
 {
-    float oldBalance = balanceCheck(username);
+    float oldBalance = balanceCheck(userName);
     char buff[32];
     float balance = -1;
     FILE *fp;
 
     balance = amount + oldBalance;
 
-    sprintf(buff, "/tmp/%04x.bal", username);
+    sprintf(buff, "/tmp/%04x.bal", userName);
 
     if ((fp = fopen(buff, "w")) != NULL) {
         sprintf(buff, "%f\0", balance);
@@ -162,9 +166,9 @@ float balanceUpdate(int username, float amount)
     return balance;
 }
 
-int balanceRun (int username, float amount)
+int balanceRun (char *userName, float amount)
 {
-    float oldBalance = balanceCheck(username);
+    float oldBalance = balanceCheck(userName);
     float balance;
 
     balance = amount + oldBalance;
@@ -172,7 +176,7 @@ int balanceRun (int username, float amount)
     if(balance <= 0)
         return 0;
     else
-        balanceUpdate(username, amount);
+        balanceUpdate(userName, amount);
 
     return 1;
 }

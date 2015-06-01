@@ -13,11 +13,12 @@
 #define MSG_ACC_RUN 16
 #define MSG_ACC_DISC 32
 
-void initMCPipes(int *inputFD, int *outputFD, int username);
-void mCHandler(int inputMCFD, int outputMCFD, int username);
-float balanceCheck(int username);
-float balanceUpdate(int username, float amount);
-int balanceRun(int username, float amount);
+void initPipes(int *inputFD, int *outputFD);
+void initMCPipes(int *inputFD, int *outputFD, char *userName);
+void mCHandler(int inputMCFD, int outputMCFD, char *userName);
+float balanceCheck(char *userName);
+float balanceUpdate(char *userName, float amount);
+int balanceRun(char *userName, float amount);
 void sendReply(int outputMCFD, int reply);
 
 typedef struct accIntent{
