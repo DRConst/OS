@@ -195,7 +195,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     int pid;
     int fd[2];
     char *psRet = malloc(1024);
-    char buff[64];
+    char buff[128];
     char *cmdString = malloc(dataSize + 1);
     accIntent ai;
     ai.msgId = MSG_ACC_RUN;
@@ -203,50 +203,44 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     char *ptr;
     char *ctrl;
     float usage;
+	int memUsed = 0, runTime = 0;
 
 
     do{
     	dataSize = read(inputClientMC, cmdString, dataSize);
 	}while(dataSize <= 0);
 
-    pid =  execStat(cmdString, userName);
+    execStat(cmdString, userName, &pid );
 
-    //pipe(fd);
-
-    /*
+    pipe(fd);
+    
     if(fork() == 0)
     {
     	close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
-		sprintf(buff, "cat /proc/%d/stat", pid);
-		//execlp("pidstat", "pidstat","-T", "ALL", "-p", buff, NULL);
-        execStat(buff);
+		
+
+		// Getting runTime CPU cstime AND MemoryUsed
+		sprintf(buff, "cat /proc/%d/stat | awk '{print $17,$23}'", pid);
+		execStat( buff, userName, NULL );
+		printf(" cmd executed " );
+		exit( EXIT_SUCCESS );
+
     }else
     {
-    	 close(fd[1]);
+		close(fd[1]);
 		read(fd[0], psRet, 1024);
-		printf("%s\n", psRet);
-		auxStrTok = strdup( psRet );
-		strtok( auxStrTok, "\n");//Gobble Up Trash
-		strtok( NULL, "\n");
-		ptr = strtok( NULL, "\n");
-		auxStrTok = ptr;
-		ptr = strtok( auxStrTok, " ");//Gobble up date
-		ptr = strtok( NULL, " ");//UID
-		ptr = strtok( NULL, " ");//PID
-		ptr = strtok( NULL, " ");//Usr
-		ptr = strtok( NULL, " ");//Sys
-		if(ptr)
-		{
-            ptr[strlen(ptr)] = '\0';
-			usage = atof(ptr);
-			ai.amount = usage;
-			write(outputClientAcc, &ai, sizeof ai);//Warn Acc of Usage
-			if(ai.amount > 0)
-				printf("%f CPU\n", ai.amount);
-			read(inputClientAcc, &killFlag, sizeof killFlag);
-		}//else process was too fast
-    }*/
+		
+		
+		wait( NULL );	
+		
+		kill( pid, SIGKIL );
+		sscanf( buff, "%d %d", &runTime, &memUsed );
+		
+		write( inputClientAcc, &ai, sizeof( ai ) );
+		write( inputClientAcc, &runTime, sizeof( int ) );
+		write( inputClientAcc, &memUsed, sizeof( int ) );
+	}
 
 }
 
@@ -382,21 +376,27 @@ void initAccountingPipes(int *accountingInputPipe, int *accountingOutputPipe)
 
 
 // Execs Given StringCommand via auxExec creating a process, returns that process's PID for stats, 0 if strCmd is not valid
-pid_t execStat( char *strCmd, char *user )
+void execStat( char *strCmd, char *user, int *p )
 {
-    pid_t p;
-
+	pid_t pid;
 
     if( !strCmd || !strlen( strCmd ) )
         return 0;
 
     // Hooking for Stats
-    if( ( p = fork() ) == 0 ) {	// Son
+    if( ( pid = fork() ) == 0 ) {	// Son
         auxExec(strCmd, user);
+		
+		// If we need statistics, keep alive
+		if( p != NULL )
+			pause();
+		
         exit( EXIT_SUCCESS );
     }
-
-    return p;
+	
+	if( p != NULL )
+		*p = pid;
+	
 }
 
 
@@ -542,9 +542,9 @@ void CmdsNext( Commands cmds, char *str )
 void CmdsExec( Commands cmds, char *user )
 {
 
-    char  usrEnv[strlen(user) + sizeof("LOGNAME=")];
+    char  usrEnv[strlen(user) + sizeof("LOGNAME=") + 1 ];
     sprintf(usrEnv, "LOGNAME=%s", user);
-    char  usrEnv2[strlen(user) + sizeof("USER=")];
+    char  usrEnv2[strlen(user) + sizeof("USER=") + 1 ];
     sprintf(usrEnv2, "USER=%s", user);
     char *envp[] = {usrEnv, usrEnv2, NULL};
 
