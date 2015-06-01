@@ -84,7 +84,8 @@ void mCHandler(int inputMCFD, int outputMCFD, char *userName)
 {
     accIntent acIt;
     int bytesRead;
-    float balance, delta;
+    int memUsed, cpuTime;
+    float balance;
     int kill = 0;
     while(1)
     {
@@ -104,7 +105,9 @@ void mCHandler(int inputMCFD, int outputMCFD, char *userName)
                 //balanceUpdate(userName, acIt.amount);
                 break;
             case MSG_ACC_RUN:
-            	printf("%f CPU", acIt.amount);
+                read(outputMCFD, &cpuTime, sizeof cpuTime);
+                read(outputMCFD, &memUsed, sizeof memUsed);
+                balance = 0.1 * memUsed + 0.01 * cpuTime;
                 (kill = (balanceUpdate(userName, acIt.amount) <= 0));
                 write(inputMCFD, &kill, sizeof kill);
                 break;

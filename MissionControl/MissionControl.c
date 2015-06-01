@@ -79,26 +79,27 @@ int main()
                 pw = malloc(1);
                 pw = "";
             }
-            if(fork() == 0)//Is Child
+            if(fork() != 0)//Is Child
             {
                 write(accountingInputPipe, &userSize, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
                 write(accountingInputPipe, userName, userSize); /*Warn Accounting of New Connection to Fork*/
 
-
+                printf("pre pipes\n");
                 initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, &stdinClient, &stdoutClient,
                               userName);
-
+                /*
                 if(doLogin(userName, pw) != E_AUTH_SUCCSS)
                 {
                     printf("Authentication Failed\n");
                     write(outputClientMC, &login, sizeof login);
                     exit(1);
-                } else{
+                } else{*/
                     login = 1;
                     write(outputClientMC, &login, sizeof login);
-                }
+                //}
                 clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe,
                               userName);
+                exit(1);
             }
             else{
                 //exit(1);
@@ -125,7 +126,10 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
             switch (it.msgId)
             {
                 case MSG_EXEC_CMD:
+                    bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe);
+                    if(bal > 5)
                     execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,it.dataSize, userName);
+                    else printf("Balance Too Low");
                     break;
                 case MSG_BAL_CHECK:
                     bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe);
@@ -210,37 +214,45 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     	dataSize = read(inputClientMC, cmdString, dataSize);
 	}while(dataSize <= 0);
 
-    execStat(cmdString, userName, &pid );
 
+    execStat(cmdString, userName, &pid );
+    sprintf(buff, "cat /proc/%d/stat | awk '{print $17, $23}' ", pid);
+    printf("%s\n", buff);
+    /*
     pipe(fd);
-    
+
     if(fork() == 0)
     {
-    	close(fd[0]);
-		dup2(fd[1], STDOUT_FILENO);
-		
+        close(fd[0]);
+        dup2(fd[1], STDOUT_FILENO);
 
-		// Getting runTime CPU cstime AND MemoryUsed
-		sprintf(buff, "cat /proc/%d/stat | awk '{print $17,$23}'", pid);
-		execStat( buff, userName, NULL );
-		printf(" cmd executed " );
-		exit( EXIT_SUCCESS );
+
+        // Getting runTime CPU cstime AND MemoryUsed
+        sprintf(buff, "cat /proc/%d/stat", pid);
+        execStat( buff, userName, NULL );
+        printf(" cmd executed " );
+        close(fd[1]);
 
     }else
     {
-		close(fd[1]);
-		read(fd[0], psRet, 1024);
-		
-		
-		wait( NULL );	
-		
-		kill( pid, SIGKIL );
-		sscanf( buff, "%d %d", &runTime, &memUsed );
-		
-		write( inputClientAcc, &ai, sizeof( ai ) );
-		write( inputClientAcc, &runTime, sizeof( int ) );
-		write( inputClientAcc, &memUsed, sizeof( int ) );
-	}
+        close(fd[1]);
+        read(fd[0], psRet, 1024);
+        printf("%s\n", psRet);
+        close(fd[0]);
+        wait( NULL );
+/*
+        kill( pid, SIGKILL );
+
+        strtok(psRet, " ");
+        //for(int i = 1; i < 17; i++)
+        //    strtok(NULL, " ");
+        sscanf( buff, "%d %d", &runTime, &memUsed );
+
+        write( inputClientAcc, &ai, sizeof( ai ) );
+        write( inputClientAcc, &runTime, sizeof( int ) );
+        write( inputClientAcc, &memUsed, sizeof( int ) );
+    }*/
+
 
 }
 
@@ -381,7 +393,7 @@ void execStat( char *strCmd, char *user, int *p )
 	pid_t pid;
 
     if( !strCmd || !strlen( strCmd ) )
-        return 0;
+        return;
 
     // Hooking for Stats
     if( ( pid = fork() ) == 0 ) {	// Son
@@ -700,7 +712,7 @@ int doLogin( char *uName, char *pwd )
     //data.initialized = 0;
 
     //secure = crypt_r( pwd, userPwd->pw_passwd, &data );
-    secure = crypt( pwd, userPwd->pw_passwd );
+    //secure = crypt( pwd, userPwd->pw_passwd );
     memset( pwd, '\0', strlen( pwd ) + 1);
 
     if( secure == NULL ) {

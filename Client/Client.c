@@ -32,7 +32,11 @@ int main()
     /*Get User Credentials*/
 
     printf("Welcome, Please Enter Your Username (31 Char Limit): ");
-    scanf("%s", userName);
+    do{
+        //fflush(stdout);
+        memset(userName, '\0', sizeof userName);
+        fgets(userName, sizeof userName, stdin);
+    }while(strcmp(buff, " \n") <= 0);
     userSize = strlen(userName) + 1;
     printf("\n");
 
@@ -44,7 +48,11 @@ int main()
     write(registerPipe, userName, userSize);
 
     printf("Welcome, Please Enter Your Password (31 Char Limit | Insert | if N/A): ");
-    scanf("%s", pw);
+    do{
+        //fflush(stdout);
+        memset(pw, '\0', sizeof pw);
+        fgets(pw, sizeof pw, stdin);
+    }while(strcmp(buff, " \n") <= 0);
     userSize = strlen(pw) + 1;
     if(userSize == 1)
     {
