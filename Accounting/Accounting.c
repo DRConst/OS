@@ -91,7 +91,7 @@ void mCHandler(int inputMCFD, int outputMCFD, char *userName)
     {
         bytesRead = read(outputMCFD, &acIt, sizeof(acIt));
         usleep(100);
-        if(bytesRead == sizeof acIt)
+        if(bytesRead > 0)
         switch (acIt.msgId)
         {
             case MSG_ACC_CHECK:
@@ -108,7 +108,9 @@ void mCHandler(int inputMCFD, int outputMCFD, char *userName)
                 read(outputMCFD, &cpuTime, sizeof cpuTime);
                 read(outputMCFD, &memUsed, sizeof memUsed);
                 balance = 0.1 * memUsed + 0.01 * cpuTime;
-                (kill = (balanceUpdate(userName, acIt.amount) <= 0));
+                if(!balance)
+                    balance += 1.5;
+                (kill = (balanceUpdate(userName, -balance) <= 0));
                 write(inputMCFD, &kill, sizeof kill);
                 break;
             case MSG_ACC_DISC:
@@ -131,7 +133,7 @@ float balanceCheck(char *userName)
     float balance;
     FILE *fp;
 
-    sprintf(buff , "/tmp/%04x.bal", userName);
+    sprintf(buff , "%s.bal", userName);
 
     if((fp = fopen(buff,"r")) != NULL)
     {
@@ -154,7 +156,7 @@ float balanceUpdate(char *userName, float amount)
 
     balance = amount + oldBalance;
 
-    sprintf(buff, "/tmp/%04x.bal", userName);
+    sprintf(buff, "%s.bal", userName);
 
     if ((fp = fopen(buff, "w")) != NULL) {
         sprintf(buff, "%f\0", balance);

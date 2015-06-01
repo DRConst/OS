@@ -79,7 +79,7 @@ int main()
                 pw = malloc(1);
                 pw = "";
             }
-            if(fork() != 0)//Is Child
+            if(fork() == 0)//Is Child
             {
                 write(accountingInputPipe, &userSize, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
                 write(accountingInputPipe, userName, userSize); /*Warn Accounting of New Connection to Fork*/
@@ -126,10 +126,10 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
             switch (it.msgId)
             {
                 case MSG_EXEC_CMD:
-                    bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe);
-                    if(bal > 5)
+                    //bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe);
+                    //if(bal > 5)
                     execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,it.dataSize, userName);
-                    else printf("Balance Too Low");
+                    //else printf("Balance Too Low");
                     break;
                 case MSG_BAL_CHECK:
                     bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe);
@@ -208,7 +208,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     char *ctrl;
     float usage;
 	int memUsed = 0, runTime = 0;
-
+    char *tmp;
 
     do{
     	dataSize = read(inputClientMC, cmdString, dataSize);
@@ -216,9 +216,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
 
 
     execStat(cmdString, userName, &pid );
-    sprintf(buff, "cat /proc/%d/stat | awk '{print $17, $23}' ", pid);
-    printf("%s\n", buff);
-    /*
+
     pipe(fd);
 
     if(fork() == 0)
@@ -230,8 +228,9 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
         // Getting runTime CPU cstime AND MemoryUsed
         sprintf(buff, "cat /proc/%d/stat", pid);
         execStat( buff, userName, NULL );
-        printf(" cmd executed " );
+        //system(buff);
         close(fd[1]);
+        exit(EXIT_FAILURE);
 
     }else
     {
@@ -240,18 +239,27 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
         printf("%s\n", psRet);
         close(fd[0]);
         wait( NULL );
-/*
+
         kill( pid, SIGKILL );
 
         strtok(psRet, " ");
-        //for(int i = 1; i < 17; i++)
-        //    strtok(NULL, " ");
-        sscanf( buff, "%d %d", &runTime, &memUsed );
+        int i;
+        for( i = 1; i < 16; i++)
+            strtok(NULL, " ");
+        tmp = strtok(NULL, " ");
+        runTime = atoi(tmp);
 
-        write( inputClientAcc, &ai, sizeof( ai ) );
-        write( inputClientAcc, &runTime, sizeof( int ) );
-        write( inputClientAcc, &memUsed, sizeof( int ) );
-    }*/
+        for( ; i < 22; i++)
+            strtok(NULL, " ");
+        tmp = strtok(NULL, " ");
+        memUsed = atoi(tmp);
+
+        sscanf( buff, "%d %d", &runTime, &memUsed );
+        ai.msgId = MSG_ACC_RUN;
+        write( outputClientAcc, &ai, sizeof( ai ) );
+        write( outputClientAcc, &runTime, sizeof( int ) );
+        write( outputClientAcc, &memUsed, sizeof( int ) );
+    }
 
 
 }

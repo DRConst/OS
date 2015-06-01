@@ -37,6 +37,7 @@ int main()
         memset(userName, '\0', sizeof userName);
         fgets(userName, sizeof userName, stdin);
     }while(strcmp(buff, " \n") <= 0);
+    strtok(userName, "\n");
     userSize = strlen(userName) + 1;
     printf("\n");
 
@@ -53,6 +54,7 @@ int main()
         memset(pw, '\0', sizeof pw);
         fgets(pw, sizeof pw, stdin);
     }while(strcmp(buff, " \n") <= 0);
+    strtok(pw, "\n");
     userSize = strlen(pw) + 1;
     if(userSize == 1)
     {
