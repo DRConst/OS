@@ -1,5 +1,7 @@
 #include <asm-generic/errno-base.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <ctype.h>
 #include "MissionControl.h"
 
 FILE *fp;
@@ -30,7 +32,6 @@ int main()
     int accountingInputPipe, accoutingOutputPipe;
     //</editor-fold>
 
-
     //<editor-fold desc="Fork Specific Pipes">
     int inputClientMC, outputClientMC, inputClientAcc, outputClientAcc, stdoutClient, stdinClient;
     //</editor-fold>
@@ -60,7 +61,7 @@ int main()
             printf("Client ");
             printf(buff);
             printf(" Connected\n");
-            if(fork() == 0)//Is Child
+            if(fork() != 0)//Is Child
             {
                 write(accountingInputPipe, &userName, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
                 initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, &stdinClient, &stdoutClient, userName);
@@ -110,6 +111,7 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
                     it.msgId = MSG_ACC_DISC;
                     write(outputClientAcc, &it, sizeof it);
                     close(outputClientAcc);
+
                     close(inputClientAcc);
                     exit(1);/*
                     shouldClose = 1;
@@ -191,8 +193,9 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     {
     	close(fd[0]);
 		dup2(fd[1], STDOUT_FILENO);
-		sprintf(buff, "%d\0", pid);
-		execlp("pidstat", "pidstat","-T", "ALL", "-p", buff, NULL);
+		sprintf(buff, "/proc/%d/stat\0", pid);
+		//execlp("pidstat", "pidstat","-T", "ALL", "-p", buff, NULL);
+        execStat(buff);
     }else
     {
     	 close(fd[1]);
@@ -425,13 +428,6 @@ pid_t execStat( char *strCmd )
     if( ( p = fork() ) == 0 ) {	// Son
         auxExec( strCmd );
         exit( EXIT_SUCCESS );
-    }else {
-        if (p == -1) { // Error
-            perror("Error Forking");
-            exit(EXIT_FAILURE);
-
-        } else // Parent
-            wait(NULL);
     }
 
     return p;

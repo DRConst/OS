@@ -8,9 +8,9 @@ void sigHandler(int s)
 {
   if (s == SIGPIPE)
   {
-	  printf("Something went wrong, restarting\n");
-	  execlp("Client", "Client", NULL);
-	  exit(1);
+      printf("Something went wrong, restarting\n");
+      execlp("Client", "Client", NULL);
+      exit(1);
   }
 }
 
@@ -124,6 +124,18 @@ void updateBalance(int inputPipe, int outputPipe, int name)
     i.msgId = MSG_BAL_UPDATE;
     i.dataSize = 0;
     float bal = 5.0f;
+    char buff[64];
+
+    printf("Please enter the ammount to deposit: ");
+    do{
+        //fflush(stdout);
+        memset(buff, '\0', sizeof buff);
+        fgets(buff, 64, stdin);
+    }while(strcmp(buff, " \n") <= 0);
+
+    bal = atof(buff);
+
+    i.dataSize = bal;
 
     write(inputPipe, &i, sizeof i); /*Write the Intent*/
 
