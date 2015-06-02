@@ -15,12 +15,12 @@ void logMC(char *str) {
 
 void sigHandler(int s)
 {
-  if (s == SIGPIPE)
-  {
-	  printf("Something went wrong, restarting\n");
-	  execlp("Client", "Client", NULL);
-	  exit(1);
-  }
+    if (s == SIGPIPE)
+    {
+        printf("Something went wrong, restarting\n");
+        execlp("Client", "Client", NULL);
+        exit(1);
+    }
 }
 
 
@@ -84,22 +84,21 @@ int main()
                 write(accountingInputPipe, &userSize, sizeof(int)); /*Warn Accounting of New Connection to Fork*/
                 write(accountingInputPipe, userName, userSize); /*Warn Accounting of New Connection to Fork*/
 
-                printf("pre pipes\n");
+
                 initUserPipes(&inputClientMC, &outputClientMC, &inputClientAcc, &outputClientAcc, &stdinClient, &stdoutClient,
                               userName);
-                /*
+
                 if(doLogin(userName, pw) != E_AUTH_SUCCSS)
                 {
                     printf("Authentication Failed\n");
                     write(outputClientMC, &login, sizeof login);
                     exit(1);
-                } else{*/
+                } else{
                     login = 1;
                     write(outputClientMC, &login, sizeof login);
-                //}
+                }
                 clientHandler(inputClientMC, outputClientMC, inputClientAcc, outputClientAcc,accountingInputPipe, accoutingOutputPipe,
                               userName);
-                exit(1);
             }
             else{
                 //exit(1);
@@ -126,10 +125,7 @@ void clientHandler(int inputClientMC, int outputClientMC, int inputClientAcc, in
             switch (it.msgId)
             {
                 case MSG_EXEC_CMD:
-                    //bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe);
-                    //if(bal > 5)
                     execCommand(inputClientMC, outputClientMC, inputClientAcc,outputClientAcc,it.dataSize, userName);
-                    //else printf("Balance Too Low");
                     break;
                 case MSG_BAL_CHECK:
                     bal = balanceCheck(inputClientAcc, outputClientAcc,accountingInputPipe);
@@ -199,7 +195,7 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     int pid;
     int fd[2];
     char *psRet = malloc(1024);
-    char buff[128];
+    char buff[64];
     char *cmdString = malloc(dataSize + 1);
     accIntent ai;
     ai.msgId = MSG_ACC_RUN;
@@ -207,60 +203,13 @@ void execCommand(int inputClientMC, int outputClientMC, int inputClientAcc, int 
     char *ptr;
     char *ctrl;
     float usage;
-	int memUsed = 0, runTime = 0;
-    char *tmp;
+
 
     do{
-    	dataSize = read(inputClientMC, cmdString, dataSize);
-	}while(dataSize <= 0);
+        dataSize = read(inputClientMC, cmdString, dataSize);
+    }while(dataSize <= 0);
 
-
-    execStat(cmdString, userName, &pid );
-
-    pipe(fd);
-
-    if(fork() == 0)
-    {
-        close(fd[0]);
-        dup2(fd[1], STDOUT_FILENO);
-
-
-        // Getting runTime CPU cstime AND MemoryUsed
-        sprintf(buff, "cat /proc/%d/stat", pid);
-        execStat( buff, userName, NULL );
-        //system(buff);
-        close(fd[1]);
-        exit(EXIT_FAILURE);
-
-    }else
-    {
-        close(fd[1]);
-        read(fd[0], psRet, 1024);
-        printf("%s\n", psRet);
-        close(fd[0]);
-        wait( NULL );
-
-        kill( pid, SIGKILL );
-
-        strtok(psRet, " ");
-        int i;
-        for( i = 1; i < 16; i++)
-            strtok(NULL, " ");
-        tmp = strtok(NULL, " ");
-        runTime = atoi(tmp);
-
-        for( ; i < 22; i++)
-            strtok(NULL, " ");
-        tmp = strtok(NULL, " ");
-        memUsed = atoi(tmp);
-
-        sscanf( buff, "%d %d", &runTime, &memUsed );
-        ai.msgId = MSG_ACC_RUN;
-        write( outputClientAcc, &ai, sizeof( ai ) );
-        write( outputClientAcc, &runTime, sizeof( int ) );
-        write( outputClientAcc, &memUsed, sizeof( int ) );
-    }
-
+    pid =  execStat(cmdString, userName);
 
 }
 
@@ -278,11 +227,11 @@ void initPipes(int *inputFD, int *outputFD)
     }
 
     if(mkfifo("/tmp/missionControlOutput.pipe", 0666) != 0)
-        if(errno != EEXIST)
-        {
-            printf("Output Pipe Creation Failed\n");
-            exit(1);
-        }
+    if(errno != EEXIST)
+    {
+        printf("Output Pipe Creation Failed\n");
+        exit(1);
+    }
 
     *inputFD = open("/tmp/missionControlInput.pipe", O_RDONLY | O_NONBLOCK);
     *outputFD = open("/tmp/missionControlOutput.pipe", O_WRONLY | O_NONBLOCK);
@@ -396,27 +345,21 @@ void initAccountingPipes(int *accountingInputPipe, int *accountingOutputPipe)
 
 
 // Execs Given StringCommand via auxExec creating a process, returns that process's PID for stats, 0 if strCmd is not valid
-void execStat( char *strCmd, char *user, int *p )
+pid_t execStat( char *strCmd, char *user )
 {
-	pid_t pid;
+    pid_t p;
+
 
     if( !strCmd || !strlen( strCmd ) )
-        return;
+        return 0;
 
     // Hooking for Stats
-    if( ( pid = fork() ) == 0 ) {	// Son
+    if( ( p = fork() ) == 0 ) {	// Son
         auxExec(strCmd, user);
-		
-		// If we need statistics, keep alive
-		if( p != NULL )
-			pause();
-		
         exit( EXIT_SUCCESS );
     }
-	
-	if( p != NULL )
-		*p = pid;
-	
+
+    return p;
 }
 
 
@@ -562,9 +505,9 @@ void CmdsNext( Commands cmds, char *str )
 void CmdsExec( Commands cmds, char *user )
 {
 
-    char  usrEnv[strlen(user) + sizeof("LOGNAME=") + 1 ];
+    char  usrEnv[strlen(user) + sizeof("LOGNAME=")];
     sprintf(usrEnv, "LOGNAME=%s", user);
-    char  usrEnv2[strlen(user) + sizeof("USER=") + 1 ];
+    char  usrEnv2[strlen(user) + sizeof("USER=")];
     sprintf(usrEnv2, "USER=%s", user);
     char *envp[] = {usrEnv, usrEnv2, NULL};
 

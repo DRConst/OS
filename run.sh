@@ -1,24 +1,24 @@
-!/bin/sh
+#!/bin/sh
 
 # Vars holding bin names
 ACCOUNTING="Accounting"
-MISSIONCONTROL = "MissionControl"
+MISSIONCONTROL="MissionControl"
 
-# Starting Servers as Daemons( No Terminal )
-$ACCOUNTING &
-$MISSIONCONTROL &
 
 while :
 do
-
-	accRunning = 'pgrep ${ACCOUNTING }'
-	msRunning = 'pgrep ${MISSIONCONTROL}'
-	
-	if [ "${accRunning:-null}" = null ]; then
+	if ps ax | grep -v grep | grep $ACCOUNTING > /dev/null
+	then
+		echo Accounting Running
+	else
 		$ACCOUNTING &
 	fi
-	
-	if [ "${msRunning:-null}" = null ]; then
+
+
+	if ps ax | grep -v grep | grep $MISSIONCONTROL > /dev/null
+	then
+		echo Mission Control Running
+	else
 		$MISSIONCONTROL &
 	fi
 		

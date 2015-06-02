@@ -2,16 +2,15 @@
 #include <stdio_ext.h>
 #include "Client.h"
 
-void checkBalance(int pipe, int outputPipe, int name);
 
 void sigHandler(int s)
 {
-  if (s == SIGPIPE)
-  {
-      printf("Something went wrong, restarting\n");
-      execlp("Client", "Client", NULL);
-      exit(1);
-  }
+    if (s == SIGPIPE)
+    {
+        printf("Something went wrong, restarting\n");
+        execlp("Client", "Client", NULL);
+        exit(1);
+    }
 }
 
 
@@ -32,12 +31,7 @@ int main()
     /*Get User Credentials*/
 
     printf("Welcome, Please Enter Your Username (31 Char Limit): ");
-    do{
-        //fflush(stdout);
-        memset(userName, '\0', sizeof userName);
-        fgets(userName, sizeof userName, stdin);
-    }while(strcmp(buff, " \n") <= 0);
-    strtok(userName, "\n");
+    scanf("%s", userName);
     userSize = strlen(userName) + 1;
     printf("\n");
 
@@ -49,12 +43,7 @@ int main()
     write(registerPipe, userName, userSize);
 
     printf("Welcome, Please Enter Your Password (31 Char Limit | Insert | if N/A): ");
-    do{
-        //fflush(stdout);
-        memset(pw, '\0', sizeof pw);
-        fgets(pw, sizeof pw, stdin);
-    }while(strcmp(buff, " \n") <= 0);
-    strtok(pw, "\n");
+    scanf("%s", pw);
     userSize = strlen(pw) + 1;
     if(userSize == 1)
     {
@@ -81,7 +70,7 @@ int main()
 
     sprintf(buff , "/tmp/%sStdin.pipe", userName);
     do {
-    stdinPipe = open(buff, O_WRONLY);
+        stdinPipe = open(buff, O_WRONLY);
     }while(stdinPipe <= 0);/*Hold Until the Server Creates the Pipe*/
     //dup2(STDIN_FILENO, stdinPipe);
     sprintf(buff , "/tmp/%sStdout.pipe", userName);
@@ -96,9 +85,9 @@ int main()
         {
             memset(b, '\0', sizeof b);
             if(read(stdoutPipe, b, sizeof b) > 0)
-            	printf("%s\n", b);
+                printf("%s\n", b);
             else
-            	usleep(100);
+                usleep(100);
             if(getppid() == 1)
                 exit(0);
         }
@@ -107,7 +96,7 @@ int main()
 
     read(outputPipe, &login, sizeof login);
     if(!login)
-       exit(1);
+        exit(1);
 
     fflush(stdin);
     while(answer)
@@ -122,13 +111,13 @@ int main()
             switch (answer)
             {
                 case 1:
-                    commandDialog(inputPipe, outputPipe, userName);
+                    commandDialog(inputPipe, outputPipe);
                     break;
                 case 2:
-                    checkBalance(inputPipe, outputPipe, userName);
+                    checkBalance(inputPipe, outputPipe);
                     break;
                 case 3:
-                    updateBalance(inputPipe, outputPipe, userName);
+                    updateBalance(inputPipe, outputPipe);
                     break;
                 default:
                     answer = 0;
@@ -141,7 +130,7 @@ int main()
     return 0;
 }
 
-void checkBalance(int inputPipe, int outputPipe, int name)
+void checkBalance(int inputPipe, int outputPipe)
 {
     Intent i;
     i.msgId = MSG_BAL_CHECK;
@@ -154,7 +143,7 @@ void checkBalance(int inputPipe, int outputPipe, int name)
     printf("Your Current Balance is %f\n", bal);
 }
 
-void updateBalance(int inputPipe, int outputPipe, int name)
+void updateBalance(int inputPipe, int outputPipe)
 {
     Intent i;
     i.msgId = MSG_BAL_UPDATE;
@@ -182,7 +171,7 @@ void updateBalance(int inputPipe, int outputPipe, int name)
     printf("Your Current Balance is %f\n", bal);
 }
 
-void commandDialog(int inputPipe, int outputPipe, int userName)
+void commandDialog(int inputPipe, int outputPipe)
 {
 
     char stB[64];
@@ -203,7 +192,7 @@ void commandDialog(int inputPipe, int outputPipe, int userName)
         //scanf("%s", buff);
         do{
             //fflush(stdout);
-        	memset(buff, '\0', sizeof buff);
+            memset(buff, '\0', sizeof buff);
             fgets(buff, 64, stdin);
         }while((asd = strcmp(buff, " \n")) <= 0);
 

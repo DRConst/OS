@@ -25,8 +25,8 @@ typedef struct intent{
 }Intent;
 
 int main();
-void checkBalance(int inputPipe, int outputPipe, int name);
-void updateBalance(int inputPipe, int outputPipe, int name);
-void commandDialog(int inputPipe, int outputPipe, int userName);
+void checkBalance(int inputPipe, int outputPipe);
+void updateBalance(int inputPipe, int outputPipe);
+void commandDialog(int inputPipe, int outputPipe);
 
 #endif //CLIENT_CLIENT_H

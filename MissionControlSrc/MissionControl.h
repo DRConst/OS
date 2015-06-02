@@ -65,7 +65,7 @@ typedef struct commands {
 
 
 void auxExec(char *input, char *user);
-void execStat( char *strCmd , char *usr, int *pid);
+pid_t execStat( char *strCmd , char *usr);
 Cmd createCmd( char *str );
 Commands CmdsInit( char *first );
 void CmdsNext( Commands cmds, char *str );

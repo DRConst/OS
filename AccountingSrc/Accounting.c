@@ -29,18 +29,18 @@ int main()
 void initPipes(int *inputFD, int *outputFD)
 {
     if(mkfifo("/tmp/accountingInput.pipe", 0777) != 0)
-        if(errno != EEXIST)
-        {
-            printf("Input Pipe Creation Failed\n");
-            exit(1);
-        }
+    if(errno != EEXIST)
+    {
+        printf("Input Pipe Creation Failed\n");
+        exit(1);
+    }
 
     if(mkfifo("/tmp/accountingOutput.pipe", 0777) != 0)
-        if(errno != EEXIST)
-        {
-            printf("Output Pipe Creation Failed\n");
-            exit(1);
-        }
+    if(errno != EEXIST)
+    {
+        printf("Output Pipe Creation Failed\n");
+        exit(1);
+    }
 
     *inputFD = open("/tmp/accountingInput.pipe", O_RDONLY);/*Blocks Until MC is Ready to Start*/
     *outputFD = open("/tmp/accountingOutput.pipe", O_WRONLY);
@@ -84,46 +84,41 @@ void mCHandler(int inputMCFD, int outputMCFD, char *userName)
 {
     accIntent acIt;
     int bytesRead;
-    int memUsed, cpuTime;
-    float balance;
+    float balance, delta;
     int kill = 0;
     while(1)
     {
         bytesRead = read(outputMCFD, &acIt, sizeof(acIt));
         usleep(100);
-        if(bytesRead > 0)
-        switch (acIt.msgId)
-        {
-            case MSG_ACC_CHECK:
-                printf("User %s has a Balance of %f\n", userName, (balance = balanceCheck(userName)));
-                write(inputMCFD, &balance, sizeof(float));
-                break;
-            case MSG_ACC_UPDATE:
-                read(outputMCFD, &balance, sizeof balance);
-                printf("User %s has a Balance of %f\n", userName, (balance = balanceUpdate(userName, balance)));
-                write(inputMCFD, &balance, sizeof(float));
-                //balanceUpdate(userName, acIt.amount);
-                break;
-            case MSG_ACC_RUN:
-                read(outputMCFD, &cpuTime, sizeof cpuTime);
-                read(outputMCFD, &memUsed, sizeof memUsed);
-                balance = 0.1 * memUsed + 0.01 * cpuTime;
-                if(!balance)
-                    balance += 1.5;
-                (kill = (balanceUpdate(userName, -balance) <= 0));
-                write(inputMCFD, &kill, sizeof kill);
-                break;
-            case MSG_ACC_DISC:
-                printf("User %s has Disconnected", userName);
-                close(inputMCFD);
-                close(outputMCFD);
-                exit(0);
-                return;
-            default:
-                printf("Accounting Intent Not Recognized");
-                exit(0);
-                break;
-        }
+        if(bytesRead == sizeof acIt)
+            switch (acIt.msgId)
+            {
+                case MSG_ACC_CHECK:
+                    printf("User %s has a Balance of %f\n", userName, (balance = balanceCheck(userName)));
+                    write(inputMCFD, &balance, sizeof(float));
+                    break;
+                case MSG_ACC_UPDATE:
+                    read(outputMCFD, &balance, sizeof balance);
+                    printf("User %s has a Balance of %f\n", userName, (balance = balanceUpdate(userName, balance)));
+                    write(inputMCFD, &balance, sizeof(float));
+                    //balanceUpdate(userName, acIt.amount);
+                    break;
+                case MSG_ACC_RUN:
+                    printf("%f CPU", acIt.amount);
+                    (kill = (balanceUpdate(userName, acIt.amount) <= 0));
+                    write(inputMCFD, &kill, sizeof kill);
+                    break;
+                case MSG_ACC_DISC:
+                    printf("User %s has Disconnected", userName);
+                    close(inputMCFD);
+                    close(outputMCFD);
+                    exit(0);
+                    return;
+                default:
+                    printf("Accounting Intent Not Recognized");
+                    exit(0);
+                    break;
+            }
     }
 }
 
@@ -133,7 +128,7 @@ float balanceCheck(char *userName)
     float balance;
     FILE *fp;
 
-    sprintf(buff , "%s.bal", userName);
+    sprintf(buff , "/tmp/%04x.bal", userName);
 
     if((fp = fopen(buff,"r")) != NULL)
     {
@@ -156,7 +151,7 @@ float balanceUpdate(char *userName, float amount)
 
     balance = amount + oldBalance;
 
-    sprintf(buff, "%s.bal", userName);
+    sprintf(buff, "/tmp/%04x.bal", userName);
 
     if ((fp = fopen(buff, "w")) != NULL) {
         sprintf(buff, "%f\0", balance);
