@@ -1,13 +1,13 @@
 #Makefile for CloudShell Project
 
 
-all : Accounting MissionControl Client
+all: Accounting MissionControl Client
 
-Accounting : Accounting.c 
-			gcc -o Accounting Accounting.c
+Accounting: AccountingSrc/Accounting.c 
+	gcc -o Accounting AccountingSrc/Accounting.c
 			
-MissionControl : MissionControl.c
-			gcc -lcrypt -o MissionControl MissionControl.c
+MissionControl: MissionControlSrc/MissionControl.c
+	gcc -lcrypt -o MissionControl MissionControlSrc/MissionControl.c
 			
-Client : Client.c
-			gcc -o Client Client.c
+Client:
+	gcc -o Client ClientSrc/Client.c
