@@ -20,7 +20,8 @@ int main()
     char userName[32], pw[32];
     int userSize;
     char buff[32];
-    int login;
+    int login = -5;
+
     int registerPipe, inputPipe, outputPipe;/*Input and Output Refer to MissionControl*/
     int stdinPipe, stdoutPipe;
     int answer = -1;
@@ -93,10 +94,15 @@ int main()
         }
 
     }
-
-    read(outputPipe, &login, sizeof login);
+    do {
+        read(outputPipe, &login, sizeof login);
+    }while(login == -5);
     if(!login)
+    {
+        printf("Authentication Failed\n");
+
         exit(1);
+    }
 
     fflush(stdin);
     while(answer)

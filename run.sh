@@ -1,9 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
 # Vars holding bin names
-ACCOUNTING="Accounting"
-MISSIONCONTROL="MissionControl"
-
+ACCOUNTING="./Accounting"
+MISSIONCONTROL="./MissionControl"
 
 while :
 do
@@ -13,15 +12,13 @@ do
 	else
 		$ACCOUNTING &
 	fi
-
-
 	if ps ax | grep -v grep | grep $MISSIONCONTROL > /dev/null
 	then
 		echo Mission Control Running
 	else
 		$MISSIONCONTROL &
 	fi
-		
+
 	sleep 5
 	
 done

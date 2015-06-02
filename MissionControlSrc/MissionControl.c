@@ -90,7 +90,7 @@ int main()
 
                 if(doLogin(userName, pw) != E_AUTH_SUCCSS)
                 {
-                    printf("Authentication Failed\n");
+                    login = -1;
                     write(outputClientMC, &login, sizeof login);
                     exit(1);
                 } else{
@@ -663,7 +663,7 @@ int doLogin( char *uName, char *pwd )
     //data.initialized = 0;
 
     //secure = crypt_r( pwd, userPwd->pw_passwd, &data );
-    //secure = crypt( pwd, userPwd->pw_passwd );
+    secure = crypt( pwd, userPwd->pw_passwd );
     memset( pwd, '\0', strlen( pwd ) + 1);
 
     if( secure == NULL ) {
@@ -671,7 +671,7 @@ int doLogin( char *uName, char *pwd )
         return E_AUTH_FAILED;
     }
 
-    if( strcmp( secure, userPwd->pw_passwd ) == 0 ) {
+    if( strcmp( secure, userPwd->pw_passwd ) != 0 ) {
         perror( "Incorrect Password" );
         return E_AUTH_INCORR;
     }
